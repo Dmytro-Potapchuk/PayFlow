@@ -1,0 +1,21 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Deploy via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 192.67.197.185
+        username: root
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd /root/bankflay
+          docker compose pull
+          docker compose up -d
