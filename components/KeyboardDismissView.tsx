@@ -1,8 +1,10 @@
 import {
     Pressable,
+    View,
     Keyboard,
     StyleSheet,
     ViewStyle,
+    Platform,
 } from "react-native";
 
 type Props = {
@@ -11,10 +13,14 @@ type Props = {
 };
 
 /**
- * Opakowuje zawartość ekranu. Tapnięcie w pusty obszar (poza inputem)
- * zamyka klawiaturę. Tapnięcie w input nadal otwiera klawiaturę.
+ * Opakowuje zawartość ekranu. Na iOS/Android: tapnięcie w pusty obszar
+ * zamyka klawiaturę. Na web: zwykły View (Pressable blokuje fokus inputów).
  */
 export default function KeyboardDismissView({ children, style }: Props) {
+    if (Platform.OS === "web") {
+        return <View style={[styles.wrapper, style]}>{children}</View>;
+    }
+
     return (
         <Pressable
             style={[styles.wrapper, style]}
