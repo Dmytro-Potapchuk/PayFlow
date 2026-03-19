@@ -1,4 +1,11 @@
-import { TextInput, Text, View, StyleSheet, TextInputProps } from "react-native";
+import {
+    TextInput,
+    Text,
+    View,
+    StyleSheet,
+    TextInputProps,
+    Platform,
+} from "react-native";
 import { theme } from "@/constants/theme";
 
 type Props = TextInputProps & {
@@ -8,7 +15,7 @@ type Props = TextInputProps & {
 
 export default function AppInput({ label, error, style, ...props }: Props) {
     return (
-        <View style={styles.wrapper}>
+        <View style={styles.wrapper} pointerEvents="box-none">
             {label && <Text style={styles.label}>{label}</Text>}
             <TextInput
                 style={[styles.input, error && styles.inputError, style]}

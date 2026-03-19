@@ -20,6 +20,7 @@ import {
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
+import { keyboardShouldPersistTaps } from "@/constants/keyboard";
 
 interface Message {
     _id: string;
@@ -200,7 +201,7 @@ export default function MessagesScreen() {
                         ListEmptyComponent={
                             <Text style={styles.empty}>Brak wiadomości</Text>
                         }
-                        keyboardShouldPersistTaps="never"
+                        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                         keyboardDismissMode="on-drag"
                     />
                 )}

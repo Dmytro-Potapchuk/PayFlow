@@ -14,6 +14,7 @@ import { getToken } from "@/api/authStorage";
 import { getUsers, updateBalance, updateRole } from "@/api/users.api";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { keyboardShouldPersistTaps } from "@/constants/keyboard";
 
 interface User {
     _id: string;
@@ -200,7 +201,7 @@ export default function AdminScreen() {
                         keyExtractor={(item) => item._id}
                         renderItem={renderItem}
                         contentContainerStyle={styles.listContent}
-                        keyboardShouldPersistTaps="never"
+                        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                         keyboardDismissMode="on-drag"
                     />
                 )}

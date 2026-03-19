@@ -18,6 +18,7 @@ import { apiRequest } from "@/api/api";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
+import { keyboardShouldPersistTaps } from "@/constants/keyboard";
 
 export default function TransferScreen() {
     const [receiverLogin, setReceiverLogin] = useState("");
@@ -76,7 +77,7 @@ export default function TransferScreen() {
             >
                 <ScrollView
                     contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="never"
+                    keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                     keyboardDismissMode="on-drag"
                 >
                     <View style={styles.header}>

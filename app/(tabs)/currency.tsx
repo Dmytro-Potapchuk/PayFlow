@@ -16,6 +16,7 @@ import { getErrorMessage } from "@/utils/errorMessage";
 import AppInput from "@/components/AppInput";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { keyboardShouldPersistTaps } from "@/constants/keyboard";
 
 interface Rate {
     code: string;
@@ -164,7 +165,7 @@ export default function CurrencyScreen() {
                         keyExtractor={(item) => item.code}
                         renderItem={renderItem}
                         contentContainerStyle={styles.listContent}
-                        keyboardShouldPersistTaps="never"
+                        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                         keyboardDismissMode="on-drag"
                     />
                 )}

@@ -16,6 +16,7 @@ import { getErrorMessage } from "@/utils/errorMessage";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
+import { keyboardShouldPersistTaps } from "@/constants/keyboard";
 
 export default function RegisterScreen() {
     const [login, setLogin] = useState("");
@@ -47,7 +48,7 @@ export default function RegisterScreen() {
             >
                 <ScrollView
                     contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="never"
+                    keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                     keyboardDismissMode="on-drag"
                 >
                     <View style={styles.header}>
