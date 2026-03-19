@@ -76,7 +76,8 @@ export default function TransferScreen() {
             >
                 <ScrollView
                     contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="handled"
+                    keyboardShouldPersistTaps="never"
+                    keyboardDismissMode="on-drag"
                 >
                     <View style={styles.header}>
                         <Text style={styles.title}>Nowy przelew</Text>

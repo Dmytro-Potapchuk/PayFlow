@@ -47,7 +47,8 @@ export default function RegisterScreen() {
             >
                 <ScrollView
                     contentContainerStyle={styles.scroll}
-                    keyboardShouldPersistTaps="handled"
+                    keyboardShouldPersistTaps="never"
+                    keyboardDismissMode="on-drag"
                 >
                     <View style={styles.header}>
                         <Text style={styles.title}>Rejestracja</Text>

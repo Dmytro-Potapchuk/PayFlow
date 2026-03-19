@@ -200,6 +200,8 @@ export default function AdminScreen() {
                         keyExtractor={(item) => item._id}
                         renderItem={renderItem}
                         contentContainerStyle={styles.listContent}
+                        keyboardShouldPersistTaps="never"
+                        keyboardDismissMode="on-drag"
                     />
                 )}
             </View>

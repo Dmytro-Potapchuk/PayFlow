@@ -200,6 +200,8 @@ export default function MessagesScreen() {
                         ListEmptyComponent={
                             <Text style={styles.empty}>Brak wiadomości</Text>
                         }
+                        keyboardShouldPersistTaps="never"
+                        keyboardDismissMode="on-drag"
                     />
                 )}
             </View>

@@ -164,6 +164,8 @@ export default function CurrencyScreen() {
                         keyExtractor={(item) => item.code}
                         renderItem={renderItem}
                         contentContainerStyle={styles.listContent}
+                        keyboardShouldPersistTaps="never"
+                        keyboardDismissMode="on-drag"
                     />
                 )}
             </View>

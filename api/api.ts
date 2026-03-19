@@ -1,3 +1,7 @@
+const API_URL = __DEV__
+    ? "http://192.67.197.185:3000"
+    : "https://dom.payflow.waw.pl";
+
 export async function apiRequest<T = unknown>(
     endpoint: string,
     method: string = "GET",
@@ -5,7 +9,7 @@ export async function apiRequest<T = unknown>(
     token?: string
 ): Promise<T> {
 
-    const response = await fetch(`http://192.168.33.2:3000${endpoint}`, {
+    const response = await fetch(`${API_URL}${endpoint}`, {
         method,
         headers: {
             "Content-Type": "application/json",
