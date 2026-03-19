@@ -12,20 +12,24 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
 
+    # 🔐 Login Docker Hub
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
+    # 🐳 Build frontend
     - name: Build frontend image
       run: |
         docker build -t keyn1990/bankflay-frontend:latest .
 
+    # 🚀 Push
     - name: Push frontend image
       run: |
         docker push keyn1990/bankflay-frontend:latest
 
+    # 🖥 Deploy VPS
     - name: Deploy via SSH
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -33,6 +37,21 @@ jobs:
         username: root
         key: ${{ secrets.SSH_KEY }}
         script: |
+          set -e
+
           cd /root/bankflay
+
+          echo "🚨 STOP old containers"
+          docker-compose down || true
+
+          echo "🧹 CLEAN dangling images"
+          docker image prune -f || true
+
+          echo "⬇️ PULL new images"
           docker-compose pull
-          docker-compose up -d --force-recreate
+
+          echo "🚀 START new containers"
+          docker-compose up -d
+
+          echo "🔍 STATUS"
+          docker ps
