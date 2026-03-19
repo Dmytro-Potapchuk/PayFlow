@@ -53,7 +53,7 @@ export default function MessagesScreen() {
                 return;
             }
             const data = await getMessages(token);
-            setMessages(data);
+            setMessages(data as Message[]);
         } catch {
             Alert.alert("Błąd", "Nie udało się pobrać wiadomości");
         } finally {
@@ -75,7 +75,7 @@ export default function MessagesScreen() {
                 return;
             }
 
-            const msg = await sendMessage(toLogin, title, content, token);
+            const msg = (await sendMessage(toLogin, title, content, token)) as Message;
             setMessages((prev) => [msg, ...prev]);
             setToLogin("");
             setTitle("");

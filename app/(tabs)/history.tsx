@@ -44,7 +44,7 @@ export default function HistoryScreen() {
         <SafeAreaView style={styles.safe}>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Historia operacji</Text>
+                    <Text style={styles.title}>Historia operacji-payflow</Text>
                     <Text style={styles.subtitle}>
                         Wszystkie Twoje transakcje
                     </Text>
