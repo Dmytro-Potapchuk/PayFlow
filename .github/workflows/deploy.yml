@@ -20,7 +20,7 @@ jobs:
 
     - name: Build frontend image
       run: |
-        docker build -t keyn1990/bankflay-frontend:latest ./frontend
+        docker build -t keyn1990/bankflay-frontend:latest .
 
     - name: Push frontend image
       run: |
