@@ -4,7 +4,7 @@ const PRODUCTION_API_URL =
         ? `${window.location.protocol}//${window.location.hostname}:3000`
         : "https://dom.payflow.waw.pl");
 
-const API_URL = __DEV__
+export const API_URL = __DEV__
     ? "http://192.67.197.185:3000"
     : PRODUCTION_API_URL;
 

@@ -1,10 +1,11 @@
 import {
     Pressable,
     SafeAreaView,
+    ScrollView,
     StyleSheet,
     Text,
+    useWindowDimensions,
     View,
-    FlatList,
     RefreshControl,
 } from "react-native";
 import { useCallback, useState } from "react";
@@ -21,6 +22,8 @@ import { useAppState } from "@/providers/AppProvider";
 export default function DashboardScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const { dashboard, refreshDashboard, unreadMessages } = useAppState();
+    const { width } = useWindowDimensions();
+    const isCompact = width <= 430;
 
     useFocusEffect(
         useCallback(() => {
@@ -36,8 +39,18 @@ export default function DashboardScreen() {
 
     return (
         <SafeAreaView style={styles.safe}>
-            <View style={styles.container}>
-                <View style={styles.header}>
+            <ScrollView
+                contentContainerStyle={styles.container}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[theme.colors.primary]}
+                    />
+                }
+            >
+                <View style={[styles.header, isCompact && styles.headerCompact]}>
                     <View>
                         <Text style={styles.greeting}>Witaj w PayFlow</Text>
                         <Text style={styles.subtitle}>Twoje konto i ostatnia aktywność</Text>
@@ -61,7 +74,7 @@ export default function DashboardScreen() {
                     balanceUsd={dashboard.balanceUsd}
                 />
 
-                <View style={styles.quickActions}>
+                <View style={[styles.quickActions, isCompact && styles.quickActionsCompact]}>
                     <AppButton
                         title="Nowy przelew"
                         onPress={() => router.push("/(tabs)/transfer")}
@@ -75,27 +88,22 @@ export default function DashboardScreen() {
                     />
                 </View>
 
-                <Text style={styles.sectionTitle}>Ostatnie transakcje</Text>
-
-                <FlatList
-                    data={dashboard.recentTransactions}
-                    keyExtractor={(item) => item._id}
-                    renderItem={({ item }) => (
-                        <TransactionItem transaction={item} />
-                    )}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <Text style={styles.empty}>Brak transakcji</Text>
-                    }
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={[theme.colors.primary]}
-                        />
-                    }
-                />
-            </View>
+                <View style={[styles.transactionsPanel, isCompact && styles.transactionsPanelCompact]}>
+                    <View style={styles.transactionsPanelHeader}>
+                        <Text style={styles.transactionsPanelTitle}>Ostatnie transakcje</Text>
+                        <Text style={styles.transactionsPanelHint}>Ostatnie operacje na koncie</Text>
+                    </View>
+                    <View style={styles.transactionsList}>
+                        {dashboard.recentTransactions.length > 0 ? (
+                            dashboard.recentTransactions.map((item) => (
+                                <TransactionItem key={item._id} transaction={item} />
+                            ))
+                        ) : (
+                            <Text style={styles.empty}>Brak transakcji</Text>
+                        )}
+                    </View>
+                </View>
+            </ScrollView>
         </SafeAreaView>
     );
 }
@@ -103,16 +111,20 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.colors.background },
     container: {
-        flex: 1,
         padding: theme.spacing.lg,
         backgroundColor: theme.colors.background,
+        paddingBottom: 140,
+        gap: theme.spacing.lg,
     },
     header: {
-        marginBottom: theme.spacing.lg,
         flexDirection: "row",
         alignItems: "flex-start",
         justifyContent: "space-between",
         gap: theme.spacing.md,
+    },
+    headerCompact: {
+        flexDirection: "column",
+        alignItems: "stretch",
     },
     unreadCard: {
         flexDirection: "row",
@@ -142,16 +154,45 @@ const styles = StyleSheet.create({
     quickActions: {
         flexDirection: "row",
         gap: theme.spacing.sm,
-        marginBottom: theme.spacing.lg,
+    },
+    quickActionsCompact: {
+        flexDirection: "column",
     },
     primaryBtn: { flex: 1 },
     secondaryBtn: { flex: 1 },
-    sectionTitle: {
-        ...theme.typography.h3,
-        color: theme.colors.text,
-        marginBottom: theme.spacing.md,
+    transactionsPanel: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radius.xl,
+        paddingTop: theme.spacing.md,
+        paddingHorizontal: theme.spacing.md,
+        paddingBottom: theme.spacing.sm,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        ...theme.shadows.md,
     },
-    listContent: { paddingBottom: 24 },
+    transactionsPanelCompact: {
+        marginTop: theme.spacing.xs,
+    },
+    transactionsPanelHeader: {
+        paddingBottom: theme.spacing.sm,
+        marginBottom: theme.spacing.xs,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.colors.border,
+        backgroundColor: theme.colors.surface,
+    },
+    transactionsPanelTitle: {
+        fontSize: 16,
+        fontWeight: "700",
+        color: theme.colors.text,
+    },
+    transactionsPanelHint: {
+        marginTop: 4,
+        fontSize: 12,
+        color: theme.colors.textMuted,
+    },
+    transactionsList: {
+        paddingTop: 4,
+    },
     empty: {
         textAlign: "center",
         color: theme.colors.textMuted,

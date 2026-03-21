@@ -37,12 +37,13 @@ export default function TransactionItem({ transaction }: { transaction: Transact
 
 const styles = StyleSheet.create({
     row: {
+        minHeight: 68,
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: theme.spacing.md,
         paddingHorizontal: theme.spacing.md,
         backgroundColor: theme.colors.surface,
-        marginBottom: theme.spacing.xs,
+        marginBottom: theme.spacing.sm,
         borderRadius: theme.radius.md,
         ...theme.shadows.sm,
     },

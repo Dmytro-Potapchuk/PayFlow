@@ -68,15 +68,13 @@ export default function TabsLayout() {
                 }}
             />
 
-            {profile?.role === "admin" && (
-                <Tabs.Screen
-                    name="admin"
-                    options={{
-                        title: "Admin",
-                        href: null,
-                    }}
-                />
-            )}
+            <Tabs.Screen
+                name="admin"
+                options={{
+                    title: "Admin",
+                    href: profile?.role === "admin" ? undefined : null,
+                }}
+            />
 
             <Tabs.Screen
                 name="profile"

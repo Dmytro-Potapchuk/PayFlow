@@ -6,6 +6,7 @@ import {
     TextInput,
     ActivityIndicator,
     SafeAreaView,
+    useWindowDimensions,
 } from "react-native";
 import { useEffect, useState } from "react";
 
@@ -31,6 +32,8 @@ export default function AdminScreen() {
     const [balanceInputs, setBalanceInputs] = useState<Record<string, string>>({});
     const [roleInputs, setRoleInputs] = useState<Record<string, string>>({});
     const { showToast } = useAppState();
+    const { width } = useWindowDimensions();
+    const isCompact = width <= 430;
 
     useEffect(() => {
         loadUsers();
@@ -133,8 +136,8 @@ export default function AdminScreen() {
                 <Text style={styles.userTitle}>{item.login}</Text>
                 <Text style={styles.userSubtitle}>{item.email}</Text>
 
-                <View style={styles.row}>
-                    <Text style={styles.label}>Saldo</Text>
+                <View style={[styles.row, isCompact && styles.rowCompact]}>
+                    <Text style={[styles.label, isCompact && styles.labelCompact]}>Saldo</Text>
                     <TextInput
                         style={styles.input}
                         value={balanceText}
@@ -152,12 +155,12 @@ export default function AdminScreen() {
                         onPress={() => handleSaveBalance(item._id)}
                         disabled={isSaving}
                         loading={isSaving}
-                        style={styles.smallBtn}
+                        style={[styles.smallBtn, isCompact && styles.smallBtnCompact]}
                     />
                 </View>
 
-                <View style={styles.row}>
-                    <Text style={styles.label}>Rola</Text>
+                <View style={[styles.row, isCompact && styles.rowCompact]}>
+                    <Text style={[styles.label, isCompact && styles.labelCompact]}>Rola</Text>
                     <TextInput
                         style={styles.input}
                         value={roleText}
@@ -175,7 +178,7 @@ export default function AdminScreen() {
                         onPress={() => handleSaveRole(item._id)}
                         disabled={isSaving}
                         loading={isSaving}
-                        style={styles.smallBtn}
+                        style={[styles.smallBtn, isCompact && styles.smallBtnCompact]}
                     />
                 </View>
             </View>
@@ -249,10 +252,17 @@ const styles = StyleSheet.create({
         marginTop: theme.spacing.sm,
         gap: theme.spacing.sm,
     },
+    rowCompact: {
+        flexDirection: "column",
+        alignItems: "stretch",
+    },
     label: {
         width: 50,
         fontSize: 14,
         color: theme.colors.textSecondary,
+    },
+    labelCompact: {
+        width: "auto",
     },
     input: {
         flex: 1,
@@ -267,5 +277,8 @@ const styles = StyleSheet.create({
     smallBtn: {
         paddingHorizontal: 16,
         minHeight: 40,
+    },
+    smallBtnCompact: {
+        width: "100%",
     },
 });
