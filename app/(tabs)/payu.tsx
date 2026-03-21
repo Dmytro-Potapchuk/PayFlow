@@ -1,10 +1,12 @@
 import {
+    Platform,
     View,
     Text,
     StyleSheet,
     SafeAreaView,
 } from "react-native";
 import { useState } from "react";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
 import { getToken } from "@/api/authStorage";
@@ -15,6 +17,8 @@ import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { useAppState } from "@/providers/AppProvider";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export default function PayuScreen() {
     const [amount, setAmount] = useState("");
@@ -43,17 +47,35 @@ export default function PayuScreen() {
 
             const profile = await getProfile(token);
             const email = profile.email;
-            const result = await createPayment(value, email, token);
+            const returnUrl =
+                Platform.OS === "web"
+                    ? undefined
+                    : Linking.createURL("/payu-result");
+            const result = (await createPayment(
+                value,
+                email,
+                token,
+                returnUrl
+            )) as { redirectUrl?: string; externalOrderId?: string };
 
             if (result?.redirectUrl) {
-                await WebBrowser.openBrowserAsync(result.redirectUrl);
+                if (Platform.OS === "web") {
+                    await WebBrowser.openBrowserAsync(result.redirectUrl);
+                } else {
+                    await WebBrowser.openAuthSessionAsync(
+                        result.redirectUrl,
+                        returnUrl
+                    );
+                }
                 await Promise.all([
                     refreshDashboard({ silent: true }),
                     refreshMessages({ silent: true, skipToast: true }),
                 ]);
                 showToast(
                     "Informacja",
-                    "Status doładowania został odświeżony.",
+                    result.externalOrderId
+                        ? "Płatność została rozpoczęta. Po powrocie status zostanie potwierdzony."
+                        : "Status doładowania został odświeżony.",
                     "info"
                 );
             } else {

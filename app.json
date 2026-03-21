@@ -2,6 +2,7 @@
   "expo": {
     "name": "PayFlow Demo",
     "slug": "PayFlow",
+    "description": "PayFlow Demo - testowa aplikacja demonstracyjna z buildami iOS przez TestFlight.",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,6 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dmytro07777.PayFlow",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -27,7 +29,9 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "themeColor": "#0d47a1",
+      "backgroundColor": "#f5f7fa"
     },
     "plugins": [
       "expo-router",
@@ -54,6 +58,12 @@
         "projectId": "eab01ac0-1f89-4fef-95dc-eb6b40f5afc7"
       }
     },
-    "owner": "dmytro07777"
+    "owner": "dmytro07777",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/eab01ac0-1f89-4fef-95dc-eb6b40f5afc7"
+    }
   }
 }

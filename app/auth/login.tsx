@@ -13,6 +13,7 @@ import { apiRequest } from "@/api/api";
 import { getErrorMessage } from "@/utils/errorMessage";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
+import PwaInstallNotice from "@/components/PwaInstallNotice";
 import { theme } from "@/constants/theme";
 import { useAppState } from "@/providers/AppProvider";
 
@@ -71,6 +72,8 @@ export default function LoginScreen() {
                             Nie służy do realnych płatności ani przechowywania środków.
                         </Text>
                     </View>
+
+                    <PwaInstallNotice />
 
                     <View style={styles.form}>
                         <AppInput

@@ -11,11 +11,24 @@
     "preview": {
       "distribution": "internal"
     },
+    "ios-preview": {
+      "extends": "production",
+      "distribution": "store",
+      "channel": "ios-preview",
+      "ios": {
+        "simulator": false
+      }
+    },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production",
+      "ios": {
+        "simulator": false
+      }
     }
   },
   "submit": {
+    "ios-preview": {},
     "production": {}
   }
 }

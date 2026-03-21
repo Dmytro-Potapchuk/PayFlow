@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import BalanceCard from "@/components/BalanceCard";
 import TransactionItem from "@/components/TransactionItem";
 import AppButton from "@/components/AppButton";
+import PwaInstallNotice from "@/components/PwaInstallNotice";
 import { theme } from "@/constants/theme";
 import { useAppState } from "@/providers/AppProvider";
 
@@ -75,6 +76,8 @@ export default function DashboardScreen() {
                         nie stanowią prawdziwych usług finansowych.
                     </Text>
                 </View>
+
+                <PwaInstallNotice compact={isCompact} />
 
                 <BalanceCard
                     balance={dashboard.balance}
