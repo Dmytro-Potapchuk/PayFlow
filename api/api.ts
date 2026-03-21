@@ -1,8 +1,6 @@
 const PRODUCTION_API_URL =
     process.env.EXPO_PUBLIC_API_URL ||
-    (typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.hostname}:3000`
-        : "https://dom.payflow.waw.pl");
+    "https://api.payflow.waw.pl";
 
 export const API_URL = __DEV__
     ? "http://192.67.197.185:3000"
