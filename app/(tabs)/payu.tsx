@@ -1,10 +1,7 @@
 import {
     View,
     Text,
-    TextInput,
     StyleSheet,
-    ActivityIndicator,
-    Alert,
     SafeAreaView,
 } from "react-native";
 import { useState } from "react";
@@ -17,20 +14,22 @@ import { createPayment } from "@/api/payu.api";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function PayuScreen() {
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
+    const { refreshDashboard, refreshMessages, showToast } = useAppState();
 
     const handlePay = async () => {
         if (!amount) {
-            Alert.alert("Błąd", "Podaj kwotę doładowania");
+            showToast("Błąd", "Podaj kwotę doładowania", "error");
             return;
         }
 
         const value = Number(amount);
         if (isNaN(value) || value <= 0) {
-            Alert.alert("Błąd", "Niepoprawna kwota");
+            showToast("Błąd", "Niepoprawna kwota", "error");
             return;
         }
 
@@ -38,7 +37,7 @@ export default function PayuScreen() {
             setLoading(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Użytkownik nie jest zalogowany");
+                showToast("Błąd", "Użytkownik nie jest zalogowany", "error");
                 return;
             }
 
@@ -48,16 +47,28 @@ export default function PayuScreen() {
 
             if (result?.redirectUrl) {
                 await WebBrowser.openBrowserAsync(result.redirectUrl);
+                await Promise.all([
+                    refreshDashboard({ silent: true }),
+                    refreshMessages({ silent: true, skipToast: true }),
+                ]);
+                showToast(
+                    "Informacja",
+                    "Status doładowania został odświeżony.",
+                    "info"
+                );
             } else {
-                Alert.alert(
+                showToast(
                     "Błąd",
                     "Brak adresu przekierowania z PayU. Sprawdź konfigurację backendu."
+                    ,
+                    "error"
                 );
             }
         } catch (error: unknown) {
-            Alert.alert(
+            showToast(
                 "Błąd",
-                getErrorMessage(error, "Nie udało się utworzyć płatności PayU")
+                getErrorMessage(error, "Nie udało się utworzyć płatności PayU"),
+                "error"
             );
         } finally {
             setLoading(false);

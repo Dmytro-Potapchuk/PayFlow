@@ -1,41 +1,24 @@
 import { View, Text, StyleSheet, SafeAreaView } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { getToken, removeToken } from "@/api/authStorage";
-import { apiRequest } from "@/api/api";
 import { router } from "expo-router";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function ProfileScreen() {
-    const [login, setLogin] = useState("");
-    const [email, setEmail] = useState("");
+    const { clearSession, profile, refreshProfile, showToast } = useAppState();
 
-    useEffect(() => {
-        loadProfile();
-    }, []);
-
-    const loadProfile = async () => {
-        try {
-            const token = await getToken();
-            if (!token) return;
-
-            const user = await apiRequest<{ login: string; email: string }>(
-                "/users/profile",
-                "GET",
-                undefined,
-                token
-            );
-
-            setLogin(user.login);
-            setEmail(user.email);
-        } catch {
-            // ignore
-        }
-    };
+    useFocusEffect(
+        useCallback(() => {
+            refreshProfile({ silent: true });
+        }, [refreshProfile])
+    );
 
     const logout = async () => {
-        await removeToken();
+        await clearSession();
+        showToast("Informacja", "Zostałeś wylogowany", "info");
         router.replace("/auth/login");
     };
 
@@ -57,11 +40,17 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Login</Text>
-                        <Text style={styles.value}>{login}</Text>
+                        <Text style={styles.value}>{profile?.login ?? "-"}</Text>
                     </View>
                     <View style={styles.infoRow}>
                         <Text style={styles.label}>Email</Text>
-                        <Text style={styles.value}>{email}</Text>
+                        <Text style={styles.value}>{profile?.email ?? "-"}</Text>
+                    </View>
+                    <View style={styles.infoRow}>
+                        <Text style={styles.label}>Rola</Text>
+                        <Text style={styles.value}>
+                            {profile?.role === "admin" ? "Administrator" : "Użytkownik"}
+                        </Text>
                     </View>
                 </View>
 

@@ -1,72 +1,84 @@
 import {
-    View,
-    FlatList,
+    Pressable,
+    SafeAreaView,
     StyleSheet,
     Text,
+    View,
+    FlatList,
     RefreshControl,
-    SafeAreaView,
 } from "react-native";
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { getDashboard } from "@/api/dashboard.api";
-import { getToken } from "@/api/authStorage";
-import { Transaction } from "@/types/transaction";
 import BalanceCard from "@/components/BalanceCard";
 import TransactionItem from "@/components/TransactionItem";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function DashboardScreen() {
-    const [balance, setBalance] = useState(0);
-    const [balanceEur, setBalanceEur] = useState(0);
-    const [balanceUsd, setBalanceUsd] = useState(0);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [refreshing, setRefreshing] = useState(false);
+    const { dashboard, refreshDashboard, unreadMessages } = useAppState();
 
-    const load = useCallback(async () => {
-        const token = await getToken();
-        const data = await getDashboard(token || "");
-        setBalance(data.balance);
-        setBalanceEur(data.balanceEur ?? 0);
-        setBalanceUsd(data.balanceUsd ?? 0);
-        setTransactions((data.recentTransactions ?? []) as Transaction[]);
-    }, []);
-
-    useEffect(() => {
-        load();
-    }, [load]);
+    useFocusEffect(
+        useCallback(() => {
+            refreshDashboard({ silent: true });
+        }, [refreshDashboard])
+    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await load();
+        await refreshDashboard({ silent: true });
         setRefreshing(false);
-    }, [load]);
+    }, [refreshDashboard]);
 
     return (
         <SafeAreaView style={styles.safe}>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.greeting}>Witaj w PayFlow</Text>
-                    <Text style={styles.subtitle}>Twoje konto</Text>
+                    <View>
+                        <Text style={styles.greeting}>Witaj w PayFlow</Text>
+                        <Text style={styles.subtitle}>Twoje konto i ostatnia aktywność</Text>
+                    </View>
+                    <Pressable
+                        style={styles.unreadCard}
+                        onPress={() => router.push("/(tabs)/messages")}
+                    >
+                        <Ionicons
+                            name="notifications-outline"
+                            size={18}
+                            color={theme.colors.primary}
+                        />
+                        <Text style={styles.unreadValue}>{unreadMessages}</Text>
+                    </Pressable>
                 </View>
 
                 <BalanceCard
-                    balance={balance}
-                    balanceEur={balanceEur}
-                    balanceUsd={balanceUsd}
+                    balance={dashboard.balance}
+                    balanceEur={dashboard.balanceEur}
+                    balanceUsd={dashboard.balanceUsd}
                 />
 
-                <AppButton
-                    title="Nowy przelew"
-                    onPress={() => router.push("/(tabs)/transfer")}
-                    style={styles.primaryBtn}
-                />
+                <View style={styles.quickActions}>
+                    <AppButton
+                        title="Nowy przelew"
+                        onPress={() => router.push("/(tabs)/transfer")}
+                        style={styles.primaryBtn}
+                    />
+                    <AppButton
+                        title="Doładuj konto"
+                        onPress={() => router.push("/(tabs)/payu")}
+                        variant="outline"
+                        style={styles.secondaryBtn}
+                    />
+                </View>
 
                 <Text style={styles.sectionTitle}>Ostatnie transakcje</Text>
 
                 <FlatList
-                    data={transactions}
+                    data={dashboard.recentTransactions}
                     keyExtractor={(item) => item._id}
                     renderItem={({ item }) => (
                         <TransactionItem transaction={item} />
@@ -95,7 +107,29 @@ const styles = StyleSheet.create({
         padding: theme.spacing.lg,
         backgroundColor: theme.colors.background,
     },
-    header: { marginBottom: theme.spacing.lg },
+    header: {
+        marginBottom: theme.spacing.lg,
+        flexDirection: "row",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: theme.spacing.md,
+    },
+    unreadCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: theme.spacing.xs,
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radius.full,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    unreadValue: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.primary,
+    },
     greeting: {
         ...theme.typography.h1,
         color: theme.colors.text,
@@ -105,7 +139,13 @@ const styles = StyleSheet.create({
         color: theme.colors.textMuted,
         marginTop: 4,
     },
-    primaryBtn: { marginBottom: theme.spacing.lg },
+    quickActions: {
+        flexDirection: "row",
+        gap: theme.spacing.sm,
+        marginBottom: theme.spacing.lg,
+    },
+    primaryBtn: { flex: 1 },
+    secondaryBtn: { flex: 1 },
     sectionTitle: {
         ...theme.typography.h3,
         color: theme.colors.text,

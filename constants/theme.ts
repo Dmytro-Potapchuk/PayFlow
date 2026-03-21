@@ -10,6 +10,7 @@ export const theme = {
         accentLight: "#26a69a",
         success: "#2e7d32",
         error: "#c62828",
+        info: "#546e7a",
         warning: "#f9a825",
         background: "#f5f7fa",
         surface: "#ffffff",

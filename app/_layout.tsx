@@ -1,11 +1,13 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet, Platform } from "react-native";
+import ToastHost from "@/components/ToastHost";
 import KeyboardDismissView from "@/components/KeyboardDismissView";
+import { AppProvider } from "@/providers/AppProvider";
 
 export default function RootLayout() {
     const content = (
-        <>
+        <AppProvider>
             <StatusBar style="dark" />
             <Stack
                 screenOptions={{
@@ -13,7 +15,8 @@ export default function RootLayout() {
                     contentStyle: { backgroundColor: "#f5f7fa" },
                 }}
             />
-        </>
+            <ToastHost />
+        </AppProvider>
     );
 
     if (Platform.OS === "web") {

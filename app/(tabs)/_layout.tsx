@@ -1,32 +1,11 @@
-import { useEffect, useState } from "react";
 import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 
-import { getToken } from "@/api/authStorage";
-import { getProfile } from "@/api/users.api";
+import AppTabBar from "@/components/AppTabBar";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function TabsLayout() {
-
-    const [role, setRole] = useState<string | null>(null);
-
-    useEffect(() => {
-        const loadRole = async () => {
-            try {
-                const token = await getToken();
-                if (!token) {
-                    setRole(null);
-                    return;
-                }
-                const user = await getProfile(token);
-                setRole(user.role ?? null);
-            } catch {
-                setRole(null);
-            }
-        };
-
-        loadRole();
-    }, []);
+    const { profile } = useAppState();
 
     return (
         <Tabs
@@ -43,15 +22,12 @@ export default function TabsLayout() {
                     fontWeight: "500",
                 },
             }}
+            tabBar={(props) => <AppTabBar {...props} />}
         >
-
             <Tabs.Screen
                 name="index"
                 options={{
                     title: "Dashboard",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="home-outline" size={size} color={color} />
-                    ),
                 }}
             />
 
@@ -59,9 +35,6 @@ export default function TabsLayout() {
                 name="transfer"
                 options={{
                     title: "Przelew",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="paper-plane-outline" size={size} color={color} />
-                    ),
                 }}
             />
 
@@ -69,9 +42,6 @@ export default function TabsLayout() {
                 name="payu"
                 options={{
                     title: "Doładowanie",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="card-outline" size={size} color={color} />
-                    ),
                 }}
             />
 
@@ -79,9 +49,7 @@ export default function TabsLayout() {
                 name="currency"
                 options={{
                     title: "Waluty",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="cash-outline" size={size} color={color} />
-                    ),
+                    href: null,
                 }}
             />
 
@@ -89,9 +57,7 @@ export default function TabsLayout() {
                 name="history"
                 options={{
                     title: "Historia",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="time-outline" size={size} color={color} />
-                    ),
+                    href: null,
                 }}
             />
 
@@ -99,20 +65,15 @@ export default function TabsLayout() {
                 name="messages"
                 options={{
                     title: "Wiadomości",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="chatbubble-ellipses-outline" size={size} color={color} />
-                    ),
                 }}
             />
 
-            {role === "admin" && (
+            {profile?.role === "admin" && (
                 <Tabs.Screen
                     name="admin"
                     options={{
                         title: "Admin",
-                        tabBarIcon: ({ color, size }) => (
-                            <Ionicons name="settings-outline" size={size} color={color} />
-                        ),
+                        href: null,
                     }}
                 />
             )}
@@ -121,13 +82,9 @@ export default function TabsLayout() {
                 name="profile"
                 options={{
                     title: "Profil",
-                    tabBarIcon: ({ color, size }) => (
-                        <Ionicons name="person-outline" size={size} color={color} />
-                    ),
+                    href: null,
                 }}
             />
-
         </Tabs>
     );
 }
-

@@ -2,7 +2,6 @@ import {
     View,
     Text,
     StyleSheet,
-    Alert,
     ScrollView,
     SafeAreaView,
     KeyboardAvoidingView,
@@ -17,11 +16,13 @@ import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function RegisterScreen() {
     const [login, setLogin] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const { showToast } = useAppState();
 
     const handleRegister = async () => {
         try {
@@ -30,12 +31,13 @@ export default function RegisterScreen() {
                 email,
                 password,
             });
-            Alert.alert("Sukces", "Konto utworzone");
+            showToast("Sukces", "Konto utworzone", "success");
             router.replace("/auth/login");
         } catch (error: unknown) {
-            Alert.alert(
+            showToast(
                 "Błąd",
-                getErrorMessage(error, "Nie udało się zarejestrować")
+                getErrorMessage(error, "Nie udało się zarejestrować"),
+                "error"
             );
         }
     };
@@ -75,6 +77,7 @@ export default function RegisterScreen() {
                         <AppInput
                             placeholder="Hasło (min. 6 znaków)"
                             secureTextEntry
+                            isPassword
                             value={password}
                             onChangeText={setPassword}
                         />

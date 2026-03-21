@@ -4,7 +4,6 @@ import {
     StyleSheet,
     FlatList,
     ActivityIndicator,
-    Alert,
     TouchableOpacity,
     SafeAreaView,
 } from "react-native";
@@ -17,6 +16,7 @@ import AppInput from "@/components/AppInput";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
+import { useAppState } from "@/providers/AppProvider";
 
 interface Rate {
     code: string;
@@ -31,6 +31,7 @@ export default function CurrencyScreen() {
     const [selected, setSelected] = useState<Rate | null>(null);
     const [result, setResult] = useState<string | null>(null);
     const [buying, setBuying] = useState(false);
+    const { refreshDashboard, refreshMessages, showToast } = useAppState();
 
     useEffect(() => {
         loadRates();
@@ -42,7 +43,7 @@ export default function CurrencyScreen() {
             const data = await getRates();
             setRates(data);
         } catch {
-            Alert.alert("Błąd", "Nie udało się pobrać kursów walut");
+            showToast("Błąd", "Nie udało się pobrać kursów walut", "error");
         } finally {
             setLoading(false);
         }
@@ -50,12 +51,12 @@ export default function CurrencyScreen() {
 
     const handleConvert = () => {
         if (!selected) {
-            Alert.alert("Błąd", "Wybierz walutę");
+            showToast("Błąd", "Wybierz walutę", "error");
             return;
         }
         const amount = Number(amountPln);
         if (isNaN(amount) || amount <= 0) {
-            Alert.alert("Błąd", "Podaj poprawną kwotę w PLN");
+            showToast("Błąd", "Podaj poprawną kwotę w PLN", "error");
             return;
         }
         const foreignAmount = amount / selected.mid;
@@ -66,33 +67,39 @@ export default function CurrencyScreen() {
 
     const handleBuy = async () => {
         if (!canBuy) {
-            Alert.alert("Błąd", "Kupno możliwe tylko dla EUR lub USD");
+            showToast("Błąd", "Kupno możliwe tylko dla EUR lub USD", "error");
             return;
         }
         const amount = Number(amountPln);
         if (isNaN(amount) || amount <= 0) {
-            Alert.alert("Błąd", "Podaj poprawną kwotę w PLN");
+            showToast("Błąd", "Podaj poprawną kwotę w PLN", "error");
             return;
         }
         try {
             setBuying(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Zaloguj się, aby kupić walutę");
+                showToast("Błąd", "Zaloguj się, aby kupić walutę", "error");
                 return;
             }
             const res = await buyCurrency(amount, selected!.code, token);
-            Alert.alert(
+            await Promise.all([
+                refreshDashboard({ silent: true }),
+                refreshMessages({ silent: true, skipToast: true }),
+            ]);
+            showToast(
                 "Sukces",
-                `Kupiono ${res.boughtAmount.toFixed(2)} ${res.currencyCode}.\n` +
-                    `Saldo PLN: ${res.balance.toFixed(2)}\n` +
-                    `Saldo EUR: ${(res.balanceEur ?? 0).toFixed(2)}\n` +
-                    `Saldo USD: ${(res.balanceUsd ?? 0).toFixed(2)}`
+                `Kupiono ${res.boughtAmount.toFixed(2)} ${res.currencyCode}.`,
+                "success"
             );
             setAmountPln("");
             setResult(null);
         } catch (err: unknown) {
-            Alert.alert("Błąd", getErrorMessage(err, "Nie udało się kupić waluty"));
+            showToast(
+                "Błąd",
+                getErrorMessage(err, "Nie udało się kupić waluty"),
+                "error"
+            );
         } finally {
             setBuying(false);
         }

@@ -7,6 +7,7 @@ import {
     SafeAreaView,
 } from "react-native";
 import { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { getToken } from "@/api/authStorage";
 import { apiRequest } from "@/api/api";
 import { Transaction } from "@/types/transaction";
@@ -34,6 +35,12 @@ export default function HistoryScreen() {
         loadHistory().finally(() => setLoading(false));
     }, [loadHistory]);
 
+    useFocusEffect(
+        useCallback(() => {
+            loadHistory();
+        }, [loadHistory])
+    );
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await loadHistory();
@@ -44,7 +51,7 @@ export default function HistoryScreen() {
         <SafeAreaView style={styles.safe}>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <Text style={styles.title}>Historia operacji-payflow</Text>
+                    <Text style={styles.title}>Historia operacji</Text>
                     <Text style={styles.subtitle}>
                         Wszystkie Twoje transakcje
                     </Text>

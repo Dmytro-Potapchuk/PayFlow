@@ -2,8 +2,6 @@ import {
     View,
     Text,
     StyleSheet,
-    Alert,
-    ActivityIndicator,
     ScrollView,
     SafeAreaView,
     KeyboardAvoidingView,
@@ -19,21 +17,23 @@ import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function TransferScreen() {
     const [receiverLogin, setReceiverLogin] = useState("");
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
+    const { refreshDashboard, refreshMessages, showToast } = useAppState();
 
     const handleTransfer = async () => {
         if (!receiverLogin || !amount) {
-            Alert.alert("Błąd", "Wszystkie pola są wymagane");
+            showToast("Błąd", "Wszystkie pola są wymagane", "error");
             return;
         }
 
         const transferAmount = Number(amount);
         if (isNaN(transferAmount) || transferAmount <= 0) {
-            Alert.alert("Błąd", "Niepoprawna kwota");
+            showToast("Błąd", "Niepoprawna kwota", "error");
             return;
         }
 
@@ -41,7 +41,7 @@ export default function TransferScreen() {
             setLoading(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Użytkownik nie jest zalogowany");
+                showToast("Błąd", "Użytkownik nie jest zalogowany", "error");
                 return;
             }
 
@@ -55,14 +55,22 @@ export default function TransferScreen() {
                 token
             );
 
-            Alert.alert("Sukces", "Przelew wykonany");
+            await Promise.all([
+                refreshDashboard({ silent: true }),
+                refreshMessages({ silent: true, skipToast: true }),
+            ]);
+            showToast("Sukces", "Przelew zakończony sukcesem", "success");
             setReceiverLogin("");
             setAmount("");
             router.push("/(tabs)/history");
         } catch (error: unknown) {
-            Alert.alert(
+            const message = getErrorMessage(error, "Nie udało się wykonać przelewu");
+            showToast(
                 "Błąd",
-                getErrorMessage(error, "Nie udało się wykonać przelewu")
+                message.toLowerCase().includes("insufficient")
+                    ? "Niewystarczające środki na koncie – doładuj konto"
+                    : message,
+                "error"
             );
         } finally {
             setLoading(false);

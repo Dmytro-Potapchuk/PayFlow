@@ -1,69 +1,61 @@
 import {
-    View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    SafeAreaView,
+    StyleSheet,
     Text,
     TextInput,
-    StyleSheet,
-    FlatList,
-    ActivityIndicator,
-    Alert,
     TouchableOpacity,
-    SafeAreaView,
+    View,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 
 import { getToken } from "@/api/authStorage";
 import {
-    getMessages,
-    sendMessage,
     readMessage,
+    sendMessage,
 } from "@/api/messages.api";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
-
-interface Message {
-    _id: string;
-    title: string;
-    content: string;
-    read: boolean;
-    senderLogin?: string;
-    createdAt?: string;
-}
+import { useAppState } from "@/providers/AppProvider";
+import type { Message } from "@/types/message";
 
 export default function MessagesScreen() {
-    const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [sending, setSending] = useState(false);
     const [toLogin, setToLogin] = useState("");
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const { messages, refreshMessages, showToast } = useAppState();
 
-    useEffect(() => {
-        loadMessages();
-    }, []);
-
-    const loadMessages = async () => {
+    const loadMessages = useCallback(async (showErrors = true) => {
         try {
             setLoading(true);
-            const token = await getToken();
-            if (!token) {
-                Alert.alert("Błąd", "Użytkownik nie jest zalogowany");
-                return;
-            }
-            const data = await getMessages(token);
-            setMessages(data as Message[]);
+            await refreshMessages({ silent: !showErrors, skipToast: true });
         } catch {
-            Alert.alert("Błąd", "Nie udało się pobrać wiadomości");
+            if (showErrors) {
+                showToast("Błąd", "Nie udało się pobrać wiadomości", "error");
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [refreshMessages, showToast]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadMessages(false);
+        }, [loadMessages])
+    );
 
     const handleSend = async () => {
         if (!toLogin || !title || !content) {
-            Alert.alert("Błąd", "Adresat, tytuł i treść są wymagane");
+            showToast("Błąd", "Adresat, tytuł i treść są wymagane", "error");
             return;
         }
 
@@ -71,18 +63,18 @@ export default function MessagesScreen() {
             setSending(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Użytkownik nie jest zalogowany");
+                showToast("Błąd", "Użytkownik nie jest zalogowany", "error");
                 return;
             }
 
-            const msg = (await sendMessage(toLogin, title, content, token)) as Message;
-            setMessages((prev) => [msg, ...prev]);
+            await sendMessage(toLogin, title, content, token);
+            await refreshMessages({ silent: true, skipToast: true });
             setToLogin("");
             setTitle("");
             setContent("");
-            Alert.alert("Sukces", "Wiadomość wysłana");
+            showToast("Sukces", "Wiadomość wysłana", "success");
         } catch {
-            Alert.alert("Błąd", "Nie udało się wysłać wiadomości");
+            showToast("Błąd", "Nie udało się wysłać wiadomości", "error");
         } finally {
             setSending(false);
         }
@@ -97,15 +89,27 @@ export default function MessagesScreen() {
                 const token = await getToken();
                 if (!token) return;
                 await readMessage(item._id, token);
-                setMessages((prev) =>
-                    prev.map((m) =>
-                        m._id === item._id ? { ...m, read: true } : m
-                    )
-                );
+                await refreshMessages({ silent: true, skipToast: true });
             } catch {
                 // ignore
             }
         }
+    };
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await refreshMessages({ silent: true, skipToast: true });
+        setRefreshing(false);
+    };
+
+    const getTypeColor = (type?: Message["type"]) => {
+        if (type === "success") {
+            return theme.colors.success;
+        }
+        if (type === "error") {
+            return theme.colors.error;
+        }
+        return theme.colors.info;
     };
 
     const renderItem = ({ item }: { item: Message }) => {
@@ -120,7 +124,7 @@ export default function MessagesScreen() {
                 activeOpacity={0.8}
             >
                 <View style={styles.messageHeader}>
-                    <View>
+                    <View style={styles.messageMain}>
                         <Text style={styles.messageTitle}>{item.title}</Text>
                         {item.senderLogin && (
                             <Text style={styles.messageSender}>
@@ -128,11 +132,28 @@ export default function MessagesScreen() {
                             </Text>
                         )}
                     </View>
-                    {!item.read && (
-                        <View style={styles.unreadBadge}>
-                            <Text style={styles.unreadText}>NOWA</Text>
+                    <View style={styles.badges}>
+                        <View
+                            style={[
+                                styles.typeBadge,
+                                { backgroundColor: `${getTypeColor(item.type)}18` },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.typeBadgeText,
+                                    { color: getTypeColor(item.type) },
+                                ]}
+                            >
+                                {(item.type ?? "info").toUpperCase()}
+                            </Text>
                         </View>
-                    )}
+                        {!item.read && (
+                            <View style={styles.unreadBadge}>
+                                <Text style={styles.unreadText}>NOWA</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
                 {item.createdAt && (
                     <Text style={styles.messageDate}>
@@ -203,6 +224,13 @@ export default function MessagesScreen() {
                         }
                         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
                         keyboardDismissMode="on-drag"
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={[theme.colors.primary]}
+                            />
+                        }
                     />
                 )}
             </View>
@@ -267,6 +295,14 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "flex-start",
+        gap: theme.spacing.sm,
+    },
+    messageMain: {
+        flex: 1,
+    },
+    badges: {
+        alignItems: "flex-end",
+        gap: theme.spacing.xs,
     },
     messageTitle: {
         fontSize: 16,
@@ -277,6 +313,15 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: theme.colors.textMuted,
         marginTop: 2,
+    },
+    typeBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: theme.radius.full,
+    },
+    typeBadgeText: {
+        fontSize: 10,
+        fontWeight: "700",
     },
     unreadBadge: {
         backgroundColor: theme.colors.error,

@@ -2,11 +2,18 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Transaction } from "@/types/transaction";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function TransactionItem({ transaction }: { transaction: Transaction }) {
+    const { showSensitiveData } = useAppState();
     const isTransfer = transaction.type === "bank_transfer";
     const icon = isTransfer ? "arrow-forward" : "card";
     const label = isTransfer ? "Przelew" : "Doładowanie";
+    const receiverLabel = transaction.receiverAccount
+        ? showSensitiveData
+            ? transaction.receiverAccount
+            : `${transaction.receiverAccount.slice(0, 2)}••••`
+        : null;
 
     return (
         <View style={styles.row}>
@@ -19,8 +26,8 @@ export default function TransactionItem({ transaction }: { transaction: Transact
             </View>
             <View style={styles.content}>
                 <Text style={styles.type}>{label}</Text>
-                {transaction.receiverAccount && (
-                    <Text style={styles.detail}>{transaction.receiverAccount}</Text>
+                {receiverLabel && (
+                    <Text style={styles.detail}>{receiverLabel}</Text>
                 )}
             </View>
             <Text style={styles.amount}>{transaction.amount} PLN</Text>

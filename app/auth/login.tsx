@@ -2,8 +2,6 @@ import {
     View,
     Text,
     StyleSheet,
-    Alert,
-    ActivityIndicator,
     SafeAreaView,
     KeyboardAvoidingView,
     Platform,
@@ -12,20 +10,21 @@ import { useState } from "react";
 import { router } from "expo-router";
 
 import { apiRequest } from "@/api/api";
-import { saveToken } from "@/api/authStorage";
 import { getErrorMessage } from "@/utils/errorMessage";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
+import { useAppState } from "@/providers/AppProvider";
 
 export default function LoginScreen() {
     const [login, setLogin] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const { authenticate, showToast } = useAppState();
 
     const handleLogin = async () => {
         if (!login || !password) {
-            Alert.alert("Błąd", "Podaj login i hasło");
+            showToast("Błąd", "Wprowadź login i hasło", "error");
             return;
         }
 
@@ -36,10 +35,18 @@ export default function LoginScreen() {
                 "POST",
                 { login, password }
             );
-            await saveToken(data.access_token);
+            await authenticate(data.access_token);
+            showToast("Sukces", "Logowanie poprawne", "success");
             router.replace("/(tabs)");
         } catch (error: unknown) {
-            Alert.alert("Błąd", getErrorMessage(error, "Nie udało się zalogować"));
+            const message = getErrorMessage(error, "Nie udało się zalogować");
+            showToast(
+                "Błąd",
+                message.toLowerCase().includes("unauthorized")
+                    ? "Nieprawidłowy login lub email"
+                    : message,
+                "error"
+            );
         } finally {
             setLoading(false);
         }
@@ -67,6 +74,7 @@ export default function LoginScreen() {
                         <AppInput
                             placeholder="Hasło"
                             secureTextEntry
+                            isPassword
                             value={password}
                             onChangeText={setPassword}
                         />

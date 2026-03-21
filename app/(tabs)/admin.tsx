@@ -5,7 +5,6 @@ import {
     FlatList,
     TextInput,
     ActivityIndicator,
-    Alert,
     SafeAreaView,
 } from "react-native";
 import { useEffect, useState } from "react";
@@ -15,6 +14,7 @@ import { getUsers, updateBalance, updateRole } from "@/api/users.api";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
+import { useAppState } from "@/providers/AppProvider";
 
 interface User {
     _id: string;
@@ -30,6 +30,7 @@ export default function AdminScreen() {
     const [savingId, setSavingId] = useState<string | null>(null);
     const [balanceInputs, setBalanceInputs] = useState<Record<string, string>>({});
     const [roleInputs, setRoleInputs] = useState<Record<string, string>>({});
+    const { showToast } = useAppState();
 
     useEffect(() => {
         loadUsers();
@@ -40,7 +41,7 @@ export default function AdminScreen() {
             setLoading(true);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Brak tokenu – zaloguj się ponownie.");
+                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
                 return;
             }
 
@@ -56,7 +57,7 @@ export default function AdminScreen() {
             setBalanceInputs(initialBalances);
             setRoleInputs(initialRoles);
         } catch {
-            Alert.alert("Błąd", "Nie udało się pobrać użytkowników.");
+            showToast("Błąd", "Nie udało się pobrać użytkowników.", "error");
         } finally {
             setLoading(false);
         }
@@ -67,7 +68,7 @@ export default function AdminScreen() {
         const newBalance = Number(balanceText);
 
         if (isNaN(newBalance)) {
-            Alert.alert("Błąd", "Saldo musi być liczbą.");
+            showToast("Błąd", "Saldo musi być liczbą.", "error");
             return;
         }
 
@@ -75,7 +76,7 @@ export default function AdminScreen() {
             setSavingId(userId);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Brak tokenu – zaloguj się ponownie.");
+                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
                 return;
             }
 
@@ -85,9 +86,9 @@ export default function AdminScreen() {
                     u._id === userId ? { ...u, balance: newBalance } : u
                 )
             );
-            Alert.alert("Sukces", "Saldo zaktualizowane.");
+            showToast("Sukces", "Saldo zaktualizowane.", "success");
         } catch {
-            Alert.alert("Błąd", "Nie udało się zaktualizować salda.");
+            showToast("Błąd", "Nie udało się zaktualizować salda.", "error");
         } finally {
             setSavingId(null);
         }
@@ -96,7 +97,7 @@ export default function AdminScreen() {
     const handleSaveRole = async (userId: string) => {
         const role = roleInputs[userId] ?? "";
         if (!role) {
-            Alert.alert("Błąd", "Rola nie może być pusta.");
+            showToast("Błąd", "Rola nie może być pusta.", "error");
             return;
         }
 
@@ -104,7 +105,7 @@ export default function AdminScreen() {
             setSavingId(userId);
             const token = await getToken();
             if (!token) {
-                Alert.alert("Błąd", "Brak tokenu – zaloguj się ponownie.");
+                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
                 return;
             }
 
@@ -114,9 +115,9 @@ export default function AdminScreen() {
                     u._id === userId ? { ...u, role } : u
                 )
             );
-            Alert.alert("Sukces", "Rola zaktualizowana.");
+            showToast("Sukces", "Rola zaktualizowana.", "success");
         } catch {
-            Alert.alert("Błąd", "Nie udało się zaktualizować roli.");
+            showToast("Błąd", "Nie udało się zaktualizować roli.", "error");
         } finally {
             setSavingId(null);
         }
