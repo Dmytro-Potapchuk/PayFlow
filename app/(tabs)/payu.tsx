@@ -60,7 +60,10 @@ export default function PayuScreen() {
 
             if (result?.redirectUrl) {
                 if (Platform.OS === "web") {
-                    await WebBrowser.openBrowserAsync(result.redirectUrl);
+                    if (typeof window !== "undefined") {
+                        window.location.assign(result.redirectUrl);
+                        return;
+                    }
                 } else {
                     await WebBrowser.openAuthSessionAsync(
                         result.redirectUrl,
