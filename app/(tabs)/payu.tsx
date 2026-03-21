@@ -81,11 +81,18 @@ export default function PayuScreen() {
                 <View style={styles.header}>
                     <Text style={styles.title}>Doładowanie konta</Text>
                     <Text style={styles.subtitle}>
-                        PayU sandbox – bezpieczna płatność
+                        PayU sandbox - płatność testowa
                     </Text>
                 </View>
 
                 <View style={styles.card}>
+                    <View style={styles.notice}>
+                        <Text style={styles.noticeTitle}>Płatności testowe</Text>
+                        <Text style={styles.noticeText}>
+                            Ten ekran korzysta z PayU sandbox. Nie wykonuje prawdziwych
+                            transakcji i nie obsługuje realnych środków.
+                        </Text>
+                    </View>
                     <AppInput
                         label="Kwota doładowania (PLN)"
                         placeholder="np. 100"
@@ -129,5 +136,24 @@ const styles = StyleSheet.create({
         borderRadius: theme.radius.lg,
         padding: theme.spacing.lg,
         ...theme.shadows.md,
+    },
+    notice: {
+        backgroundColor: "#fff8e1",
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor: "#ffe082",
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+    },
+    noticeTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.warning,
+        marginBottom: 4,
+    },
+    noticeText: {
+        fontSize: 13,
+        lineHeight: 18,
+        color: "#6d4c41",
     },
 });

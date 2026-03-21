@@ -60,8 +60,16 @@ export default function LoginScreen() {
             >
                 <View style={styles.container}>
                     <View style={styles.brand}>
-                        <Text style={styles.logo}>PayFlow</Text>
-                        <Text style={styles.tagline}>Bankowość mobilna</Text>
+                        <Text style={styles.logo}>PayFlow Demo</Text>
+                        <Text style={styles.tagline}>Wersja testowa / sandbox</Text>
+                    </View>
+
+                    <View style={styles.notice}>
+                        <Text style={styles.noticeTitle}>Aplikacja testowa</Text>
+                        <Text style={styles.noticeText}>
+                            To demo nie jest prawdziwą aplikacją bankową ani płatniczą.
+                            Nie służy do realnych płatności ani przechowywania środków.
+                        </Text>
                     </View>
 
                     <View style={styles.form}>
@@ -107,7 +115,7 @@ const styles = StyleSheet.create({
     },
     brand: {
         alignItems: "center",
-        marginBottom: theme.spacing.xl,
+        marginBottom: theme.spacing.lg,
     },
     logo: {
         fontSize: 36,
@@ -119,6 +127,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: theme.colors.textMuted,
         marginTop: 8,
+    },
+    notice: {
+        backgroundColor: "#fff8e1",
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor: "#ffe082",
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.lg,
+    },
+    noticeTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.warning,
+        marginBottom: 4,
+    },
+    noticeText: {
+        fontSize: 13,
+        lineHeight: 18,
+        color: "#6d4c41",
     },
     form: {
         backgroundColor: theme.colors.surface,

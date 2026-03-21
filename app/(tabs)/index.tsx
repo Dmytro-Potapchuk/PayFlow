@@ -52,7 +52,7 @@ export default function DashboardScreen() {
             >
                 <View style={[styles.header, isCompact && styles.headerCompact]}>
                     <View>
-                        <Text style={styles.greeting}>Witaj w PayFlow</Text>
+                        <Text style={styles.greeting}>Witaj w PayFlow Demo</Text>
                         <Text style={styles.subtitle}>Twoje konto i ostatnia aktywność</Text>
                     </View>
                     <Pressable
@@ -66,6 +66,14 @@ export default function DashboardScreen() {
                         />
                         <Text style={styles.unreadValue}>{unreadMessages}</Text>
                     </Pressable>
+                </View>
+
+                <View style={styles.notice}>
+                    <Text style={styles.noticeTitle}>Tryb demonstracyjny</Text>
+                    <Text style={styles.noticeText}>
+                        Dane, saldo i płatności w tej aplikacji mają charakter testowy i
+                        nie stanowią prawdziwych usług finansowych.
+                    </Text>
                 </View>
 
                 <BalanceCard
@@ -141,6 +149,24 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "700",
         color: theme.colors.primary,
+    },
+    notice: {
+        backgroundColor: "#fff8e1",
+        borderRadius: theme.radius.lg,
+        borderWidth: 1,
+        borderColor: "#ffe082",
+        padding: theme.spacing.md,
+    },
+    noticeTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.warning,
+        marginBottom: 4,
+    },
+    noticeText: {
+        fontSize: 13,
+        lineHeight: 18,
+        color: "#6d4c41",
     },
     greeting: {
         ...theme.typography.h1,

@@ -56,7 +56,15 @@ export default function RegisterScreen() {
                     <View style={styles.header}>
                         <Text style={styles.title}>Rejestracja</Text>
                         <Text style={styles.subtitle}>
-                            Utwórz konto w PayFlow
+                            Utwórz konto w PayFlow Demo
+                        </Text>
+                    </View>
+
+                    <View style={styles.notice}>
+                        <Text style={styles.noticeTitle}>Wersja testowa</Text>
+                        <Text style={styles.noticeText}>
+                            Konto tworzone jest tylko do celów demonstracyjnych. Aplikacja
+                            nie jest prawdziwym systemem bankowym ani płatniczym.
                         </Text>
                     </View>
 
@@ -115,6 +123,25 @@ const styles = StyleSheet.create({
         ...theme.typography.bodySmall,
         color: theme.colors.textMuted,
         marginTop: 4,
+    },
+    notice: {
+        backgroundColor: "#fff8e1",
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor: "#ffe082",
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.lg,
+    },
+    noticeTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.warning,
+        marginBottom: 4,
+    },
+    noticeText: {
+        fontSize: 13,
+        lineHeight: 18,
+        color: "#6d4c41",
     },
     form: {
         backgroundColor: theme.colors.surface,
