@@ -5,32 +5,54 @@ import { theme } from "@/constants/theme";
 import { useAppState } from "@/providers/AppProvider";
 
 export default function TransactionItem({ transaction }: { transaction: Transaction }) {
-    const { showSensitiveData } = useAppState();
+    const { profile, showSensitiveData } = useAppState();
     const isTransfer = transaction.type === "bank_transfer";
-    const icon = isTransfer ? "arrow-forward" : "card";
-    const label = isTransfer ? "Przelew" : "Doładowanie";
-    const receiverLabel = transaction.receiverAccount
-        ? showSensitiveData
-            ? transaction.receiverAccount
-            : `${transaction.receiverAccount.slice(0, 2)}••••`
-        : null;
+    const isOutgoingTransfer =
+        isTransfer && Boolean(profile?._id) && transaction.senderId === profile?._id;
+    const isIncomingTransfer = isTransfer && !isOutgoingTransfer;
+
+    const icon = isIncomingTransfer
+        ? "arrow-back"
+        : isOutgoingTransfer
+          ? "arrow-forward"
+          : "card";
+    const iconColor = isIncomingTransfer
+        ? theme.colors.success
+        : isOutgoingTransfer
+          ? theme.colors.error
+          : theme.colors.primary;
+    const label = isIncomingTransfer
+        ? "Przelew przychodzący"
+        : isOutgoingTransfer
+          ? "Przelew wychodzący"
+          : "Doładowanie";
+    const receiverLabel =
+        isOutgoingTransfer && transaction.receiverAccount
+            ? showSensitiveData
+                ? `Do: ${transaction.receiverAccount}`
+                : `Do: ${transaction.receiverAccount.slice(0, 2)}••••`
+            : isIncomingTransfer
+              ? "Wpływ na konto"
+              : "Doładowanie salda";
+    const amountPrefix = isIncomingTransfer ? "+" : isOutgoingTransfer ? "-" : "+";
 
     return (
         <View style={styles.row}>
-            <View style={styles.iconWrap}>
+            <View style={[styles.iconWrap, { backgroundColor: `${iconColor}18` }]}>
                 <Ionicons
                     name={icon as "arrow-forward"}
                     size={20}
-                    color={theme.colors.primary}
+                    color={iconColor}
                 />
             </View>
             <View style={styles.content}>
                 <Text style={styles.type}>{label}</Text>
-                {receiverLabel && (
-                    <Text style={styles.detail}>{receiverLabel}</Text>
-                )}
+                <Text style={styles.detail}>{receiverLabel}</Text>
             </View>
-            <Text style={styles.amount}>{transaction.amount} PLN</Text>
+            <Text style={[styles.amount, { color: iconColor }]}>
+                {amountPrefix}
+                {transaction.amount} PLN
+            </Text>
         </View>
     );
 }
