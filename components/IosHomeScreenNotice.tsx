@@ -4,12 +4,38 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/constants/theme";
 
+const DISMISS_STORAGE_KEY = "payflow-ios-homescreen-notice-dismissed";
+
 type Props = {
     compact?: boolean;
 };
 
-export default function PwaInstallNotice({ compact = false }: Props) {
-    const [dismissed, setDismissed] = useState(false);
+function readDismissedFromStorage() {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+        return false;
+    }
+
+    try {
+        return window.localStorage.getItem(DISMISS_STORAGE_KEY) === "1";
+    } catch {
+        return false;
+    }
+}
+
+function persistDismissed() {
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        window.localStorage.setItem(DISMISS_STORAGE_KEY, "1");
+    } catch {
+        // Ignore storage failures in private browsing or restricted contexts.
+    }
+}
+
+export default function IosHomeScreenNotice({ compact = false }: Props) {
+    const [dismissed, setDismissed] = useState(readDismissedFromStorage);
 
     const shouldShow = useMemo(() => {
         if (Platform.OS !== "web" || dismissed || typeof window === "undefined") {
@@ -28,6 +54,11 @@ export default function PwaInstallNotice({ compact = false }: Props) {
         return isIos && isSafari && !isStandalone;
     }, [dismissed]);
 
+    const handleDismiss = () => {
+        setDismissed(true);
+        persistDismissed();
+    };
+
     if (!shouldShow) {
         return null;
     }
@@ -43,7 +74,7 @@ export default function PwaInstallNotice({ compact = false }: Props) {
                     />
                     <Text style={styles.title}>Zainstaluj na iPhone</Text>
                 </View>
-                <Pressable onPress={() => setDismissed(true)} style={styles.closeButton}>
+                <Pressable onPress={handleDismiss} style={styles.closeButton}>
                     <Ionicons
                         name="close"
                         size={18}
@@ -53,7 +84,7 @@ export default function PwaInstallNotice({ compact = false }: Props) {
             </View>
             <Text style={styles.text}>
                 Otwórz menu Safari, wybierz `Udostępnij`, a następnie `Dodaj do
-                ekranu początkowego`, aby zainstalować PayFlow Demo jak aplikację.
+                ekranu początkowego`, aby dodać PayFlow Demo do ekranu głównego.
             </Text>
         </View>
     );
@@ -61,10 +92,10 @@ export default function PwaInstallNotice({ compact = false }: Props) {
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: "#eef4ff",
+        backgroundColor: theme.colors.iosNoticeBackground,
         borderRadius: theme.radius.lg,
         borderWidth: 1,
-        borderColor: "#c5d8ff",
+        borderColor: theme.colors.iosNoticeBorder,
         padding: theme.spacing.md,
         gap: theme.spacing.sm,
     },

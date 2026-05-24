@@ -3,9 +3,11 @@ import {
     Text,
     StyleSheet,
     ActivityIndicator,
+    StyleProp,
     ViewStyle,
     TextStyle,
 } from "react-native";
+
 import { theme } from "@/constants/theme";
 
 type Variant = "primary" | "secondary" | "outline" | "danger";
@@ -16,8 +18,8 @@ type Props = {
     variant?: Variant;
     disabled?: boolean;
     loading?: boolean;
-    style?: ViewStyle;
-    textStyle?: TextStyle;
+    style?: StyleProp<ViewStyle>;
+    textStyle?: StyleProp<TextStyle>;
 };
 
 export default function AppButton({
@@ -46,7 +48,11 @@ export default function AppButton({
             {loading ? (
                 <ActivityIndicator
                     size="small"
-                    color={variant === "primary" || variant === "danger" ? "#fff" : theme.colors.primary}
+                    color={
+                        variant === "primary" || variant === "danger"
+                            ? theme.colors.onPrimary
+                            : theme.colors.primary
+                    }
                 />
             ) : (
                 <Text style={[styles.text, styles[`text_${variant}`], textStyle]}>
@@ -88,8 +94,8 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "600",
     },
-    text_primary: { color: "#fff" },
-    text_secondary: { color: "#fff" },
+    text_primary: { color: theme.colors.onPrimary },
+    text_secondary: { color: theme.colors.onPrimary },
     text_outline: { color: theme.colors.primary },
-    text_danger: { color: "#fff" },
+    text_danger: { color: theme.colors.onPrimary },
 });

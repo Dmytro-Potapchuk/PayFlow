@@ -1,8 +1,17 @@
-jest.mock("@/api/api", () => ({
-  apiRequest: jest.fn(),
+const mockGet = jest.fn();
+const mockPost = jest.fn();
+const mockPatch = jest.fn();
+const mockDelete = jest.fn();
+
+jest.mock("@/api/httpClient", () => ({
+  httpClient: {
+    get: (...args: unknown[]) => mockGet(...args),
+    post: (...args: unknown[]) => mockPost(...args),
+    patch: (...args: unknown[]) => mockPatch(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
+  },
 }));
 
-import { apiRequest } from "@/api/api";
 import { login, register } from "@/api/auth.api";
 import { getDashboard } from "@/api/dashboard.api";
 import {
@@ -30,32 +39,35 @@ import {
   updateRole,
 } from "@/api/users.api";
 
-const apiRequestMock = apiRequest as jest.Mock;
-
 describe("api wrapper modules", () => {
   beforeEach(() => {
-    apiRequestMock.mockReset();
-    apiRequestMock.mockResolvedValue({ ok: true });
+    mockGet.mockReset().mockResolvedValue({ ok: true });
+    mockPost.mockReset().mockResolvedValue({ ok: true });
+    mockPatch.mockReset().mockResolvedValue({ ok: true });
+    mockDelete.mockReset().mockResolvedValue({ ok: true });
   });
 
   it("obsługuje endpointy auth", async () => {
     await login("demo", "pass");
     await register("demo", "demo@example.com", "pass123");
 
-    expect(apiRequestMock).toHaveBeenNthCalledWith(1, "/auth/login", "POST", {
+    expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/login", {
       login: "demo",
       password: "pass",
     });
-    expect(apiRequestMock).toHaveBeenNthCalledWith(
-      2,
-      "/auth/register",
-      "POST",
-      {
-        login: "demo",
-        email: "demo@example.com",
-        password: "pass123",
-      }
-    );
+    expect(mockPost).toHaveBeenNthCalledWith(2, "/auth/register", {
+      login: "demo",
+      email: "demo@example.com",
+      password: "pass123",
+    });
+  });
+
+  it("odrzuca niepoprawne dane auth przed wywołaniem API", async () => {
+    await expect(login("", "pass")).rejects.toThrow("Login nie może być puste");
+    await expect(
+      register("demo", "zly-email", "pass123")
+    ).rejects.toThrow("Podaj poprawny adres email");
+    expect(mockPost).not.toHaveBeenCalled();
   });
 
   it("obsługuje dashboard, users, transactions, currency i payu", async () => {
@@ -73,65 +85,39 @@ describe("api wrapper modules", () => {
     await createPayment(250, "demo@example.com", "token-1", "https://continue");
     await confirmPayment("order-1", "token-1");
 
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/dashboard",
-      "GET",
-      undefined,
-      "token-1"
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/users/profile",
-      "GET",
-      undefined,
-      "token-1"
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith("/users", "GET", undefined, "token-1");
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith("/dashboard", "token-1");
+    expect(mockGet).toHaveBeenCalledWith("/users/profile", "token-1");
+    expect(mockGet).toHaveBeenCalledWith("/users", "token-1");
+    expect(mockPatch).toHaveBeenCalledWith(
       "/users/u1/balance",
-      "PATCH",
       { balance: 320 },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPatch).toHaveBeenCalledWith(
       "/users/u1/role",
-      "PATCH",
       { role: "admin" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/transactions/bank-transfer",
-      "POST",
       { receiverAccount: "PL001", amount: 99 },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/transactions/history",
-      "GET",
-      undefined,
-      "token-1"
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/transactions/tx-1",
-      "GET",
-      undefined,
-      "token-1"
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith("/currency/rates");
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith("/transactions/history", "token-1");
+    expect(mockGet).toHaveBeenCalledWith("/transactions/tx-1", "token-1");
+    expect(mockGet).toHaveBeenCalledWith("/currency/rates");
+    expect(mockPost).toHaveBeenCalledWith(
       "/currency/buy",
-      "POST",
       { amountPln: 120, currencyCode: "EUR" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/payu/create-payment",
-      "POST",
       { amount: 250, email: "demo@example.com" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/payu/create-payment",
-      "POST",
       {
         amount: 250,
         email: "demo@example.com",
@@ -139,10 +125,25 @@ describe("api wrapper modules", () => {
       },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/payu/confirm/order-1",
-      "GET",
-      undefined,
+    expect(mockGet).toHaveBeenCalledWith("/payu/confirm/order-1", "token-1");
+  });
+
+  it("koduje identyfikatory w ścieżkach URL", async () => {
+    await getTransaction("id/with/slash", "token-1");
+    await confirmPayment("order id", "token-1");
+    await deleteConversationMessage("msg/id", "token-1");
+
+    expect(mockGet).toHaveBeenCalledWith(
+      "/transactions/id%2Fwith%2Fslash",
+      "token-1"
+    );
+    expect(mockGet).toHaveBeenCalledWith(
+      "/payu/confirm/order%20id",
+      "token-1"
+    );
+    expect(mockDelete).toHaveBeenCalledWith(
+      "/messages/messages/msg%2Fid",
+      {},
       "token-1"
     );
   });
@@ -156,66 +157,52 @@ describe("api wrapper modules", () => {
     await markConversationRead("c1", "token-1");
     await deleteConversationMessage("m1", "token-1");
     await clearConversation("c1", "token-1");
+    await searchContacts("", "token-1");
     await searchContacts("zażółć gęślą", "token-1");
     await sendMessage("anna", "Temat", "Treść", "token-1");
 
-    expect(apiRequestMock).toHaveBeenCalledWith(
-      "/messages/conversations",
-      "GET",
-      undefined,
-      "token-1"
-    );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith("/messages/conversations", "token-1");
+    expect(mockGet).toHaveBeenCalledWith(
       "/messages/conversations/c1/messages",
-      "GET",
-      undefined,
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/messages/conversations/direct",
-      "POST",
       { login: "anna" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/messages/conversations/c1/messages",
-      "POST",
       { content: "hej" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/messages/conversations/c1/messages",
-      "POST",
       { content: "hej", title: "Tytuł" },
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPatch).toHaveBeenCalledWith(
       "/messages/conversations/c1/read",
-      "PATCH",
       {},
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockDelete).toHaveBeenCalledWith(
       "/messages/messages/m1",
-      "DELETE",
       {},
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockDelete).toHaveBeenCalledWith(
       "/messages/conversations/c1/messages",
-      "DELETE",
       {},
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockGet).toHaveBeenCalledWith("/messages/contacts", "token-1");
+    expect(mockGet).toHaveBeenCalledWith(
       "/messages/contacts?query=za%C5%BC%C3%B3%C5%82%C4%87%20g%C4%99%C5%9Bl%C4%85",
-      "GET",
-      undefined,
       "token-1"
     );
-    expect(apiRequestMock).toHaveBeenCalledWith(
+    expect(mockPost).toHaveBeenCalledWith(
       "/messages",
-      "POST",
       { receiverLogin: "anna", title: "Temat", content: "Treść" },
       "token-1"
     );

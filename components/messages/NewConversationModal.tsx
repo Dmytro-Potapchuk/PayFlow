@@ -1,6 +1,9 @@
+import { useCallback } from "react";
 import {
     ActivityIndicator,
+    FlatList,
     KeyboardAvoidingView,
+    ListRenderItem,
     Modal,
     Platform,
     Pressable,
@@ -24,6 +27,36 @@ type Props = {
     loading: boolean;
 };
 
+function ContactListItem({
+    contact,
+    onSelect,
+}: {
+    contact: ContactSearchResult;
+    onSelect: (contact: ContactSearchResult) => void;
+}) {
+    return (
+        <Pressable
+            style={styles.contactRow}
+            onPress={() => onSelect(contact)}
+        >
+            <View style={styles.contactAvatar}>
+                <Text style={styles.contactAvatarText}>
+                    {contact.login.slice(0, 2).toUpperCase()}
+                </Text>
+            </View>
+            <View style={styles.contactTextWrap}>
+                <Text style={styles.contactLogin}>{contact.login}</Text>
+                <Text style={styles.contactEmail}>{contact.email}</Text>
+            </View>
+            <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={18}
+                color={theme.colors.primary}
+            />
+        </Pressable>
+    );
+}
+
 export default function NewConversationModal({
     visible,
     query,
@@ -33,6 +66,13 @@ export default function NewConversationModal({
     contacts,
     loading,
 }: Props) {
+    const renderContact = useCallback<ListRenderItem<ContactSearchResult>>(
+        ({ item }) => (
+            <ContactListItem contact={item} onSelect={onSelectContact} />
+        ),
+        [onSelectContact]
+    );
+
     return (
         <Modal
             visible={visible}
@@ -57,6 +97,11 @@ export default function NewConversationModal({
                             </Pressable>
                         </View>
 
+                        <Text style={styles.subtitle}>
+                            Wybierz użytkownika z listy lub wpisz login / e-mail, aby
+                            zawęzić wyniki.
+                        </Text>
+
                         <View style={styles.searchWrap}>
                             <Ionicons
                                 name="search-outline"
@@ -64,7 +109,7 @@ export default function NewConversationModal({
                                 color={theme.colors.textMuted}
                             />
                             <TextInput
-                                placeholder="Wpisz login lub email"
+                                placeholder="Szukaj po loginie lub e-mailu"
                                 placeholderTextColor={theme.colors.textMuted}
                                 value={query}
                                 onChangeText={onChangeQuery}
@@ -80,39 +125,25 @@ export default function NewConversationModal({
                                 style={styles.loader}
                             />
                         ) : contacts.length > 0 ? (
-                            contacts.map((contact) => (
-                                <Pressable
-                                    key={contact._id}
-                                    style={styles.contactRow}
-                                    onPress={() => onSelectContact(contact)}
-                                >
-                                    <View style={styles.contactAvatar}>
-                                        <Text style={styles.contactAvatarText}>
-                                            {contact.login.slice(0, 2).toUpperCase()}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.contactTextWrap}>
-                                        <Text style={styles.contactLogin}>
-                                            {contact.login}
-                                        </Text>
-                                        <Text style={styles.contactEmail}>
-                                            {contact.email}
-                                        </Text>
-                                    </View>
-                                    <Ionicons
-                                        name="chatbubble-ellipses-outline"
-                                        size={18}
-                                        color={theme.colors.primary}
-                                    />
-                                </Pressable>
-                            ))
+                            <FlatList
+                                data={contacts}
+                                keyExtractor={(item) => item._id}
+                                renderItem={renderContact}
+                                keyboardShouldPersistTaps="handled"
+                                style={styles.contactList}
+                                contentContainerStyle={styles.contactListContent}
+                            />
                         ) : (
                             <View style={styles.emptyWrap}>
                                 <Text style={styles.emptyTitle}>
-                                    Brak kontaktów
+                                    {query.trim()
+                                        ? "Brak pasujących użytkowników"
+                                        : "Brak innych użytkowników"}
                                 </Text>
                                 <Text style={styles.emptyText}>
-                                    Wyszukaj użytkownika po loginie albo adresie e-mail.
+                                    {query.trim()
+                                        ? "Spróbuj innego loginu lub adresu e-mail."
+                                        : "Gdy ktoś się zarejestruje, pojawi się tutaj na liście."}
                                 </Text>
                             </View>
                         )}
@@ -156,6 +187,11 @@ const styles = StyleSheet.create({
         ...theme.typography.h2,
         color: theme.colors.text,
     },
+    subtitle: {
+        ...theme.typography.bodySmall,
+        color: theme.colors.textMuted,
+        lineHeight: 18,
+    },
     closeButton: {
         width: 36,
         height: 36,
@@ -180,6 +216,12 @@ const styles = StyleSheet.create({
     },
     loader: {
         marginVertical: theme.spacing.md,
+    },
+    contactList: {
+        flexGrow: 0,
+    },
+    contactListContent: {
+        gap: theme.spacing.sm,
     },
     contactRow: {
         flexDirection: "row",

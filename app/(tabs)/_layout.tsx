@@ -2,10 +2,12 @@ import { Tabs } from "expo-router";
 
 import AppTabBar from "@/components/AppTabBar";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useAdminRouteGuard } from "@/hooks/useAdminRouteGuard";
+import { useProfile } from "@/providers/AppProvider";
 
 export default function TabsLayout() {
-    const { profile } = useAppState();
+    const { profile } = useProfile();
+    useAdminRouteGuard();
 
     return (
         <Tabs

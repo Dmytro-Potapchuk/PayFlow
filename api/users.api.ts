@@ -1,17 +1,57 @@
-import { apiRequest } from "./api";
+import { endpoints } from "./endpoints";
+import { httpClient } from "./httpClient";
+import {
+    assertPositiveNumber,
+    assertResourceId,
+    assertToken,
+    assertUserRole,
+} from "./validation";
+import type {
+    AdminUserSummary,
+    UserProfile,
+    UserRole,
+} from "@/types/api.types";
 
-export const getProfile = (token: string) => {
-    return apiRequest("/users/profile", "GET", undefined, token);
-};
+export async function getProfile(token: string): Promise<UserProfile> {
+    assertToken(token);
 
-export const getUsers = (token: string) => {
-    return apiRequest("/users", "GET", undefined, token);
-};
+    return httpClient.get<UserProfile>(endpoints.users.profile(), token);
+}
 
-export const updateBalance = (id: string, balance: number, token: string) => {
-    return apiRequest(`/users/${id}/balance`, "PATCH", { balance }, token);
-};
+export async function getUsers(token: string): Promise<AdminUserSummary[]> {
+    assertToken(token);
 
-export const updateRole = (id: string, role: string, token: string) => {
-    return apiRequest(`/users/${id}/role`, "PATCH", { role }, token);
-};
+    return httpClient.get<AdminUserSummary[]>(endpoints.users.list(), token);
+}
+
+export async function updateBalance(
+    id: string,
+    balance: number,
+    token: string
+): Promise<AdminUserSummary> {
+    assertToken(token);
+    assertResourceId(id, "Identyfikator użytkownika");
+    assertPositiveNumber(balance, "Saldo");
+
+    return httpClient.patch<AdminUserSummary>(
+        endpoints.users.balance(id),
+        { balance },
+        token
+    );
+}
+
+export async function updateRole(
+    id: string,
+    role: UserRole,
+    token: string
+): Promise<AdminUserSummary> {
+    assertToken(token);
+    assertResourceId(id, "Identyfikator użytkownika");
+    assertUserRole(role);
+
+    return httpClient.patch<AdminUserSummary>(
+        endpoints.users.role(id),
+        { role },
+        token
+    );
+}

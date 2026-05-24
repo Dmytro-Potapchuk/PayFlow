@@ -6,97 +6,127 @@ import {
     SafeAreaView,
 } from "react-native";
 import { useState } from "react";
+import { router } from "expo-router";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 
-import { getToken } from "@/api/authStorage";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import { getErrorMessage } from "@/utils/errorMessage";
+import { validatePayuAmount } from "@/utils/payuForm";
+import { logError } from "@/utils/logError";
+import { useIsMounted } from "@/hooks/useIsMounted";
 import { getProfile } from "@/api/users.api";
 import { createPayment } from "@/api/payu.api";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useDashboard, useMessages, useToast } from "@/providers/AppProvider";
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function PayuScreen() {
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
-    const { refreshDashboard, refreshMessages, showToast } = useAppState();
+    const { refreshDashboard } = useDashboard();
+    const { refreshMessages } = useMessages();
+    const { showToast } = useToast();
+    const isMountedRef = useIsMounted();
+    const { requireToken } = useRequireAuthToken();
 
     const handlePay = async () => {
-        if (!amount) {
-            showToast("Błąd", "Podaj kwotę doładowania", "error");
+        const validationError = validatePayuAmount(amount);
+        if (validationError) {
+            showToast("Błąd", validationError, "error");
             return;
         }
 
         const value = Number(amount);
-        if (isNaN(value) || value <= 0) {
-            showToast("Błąd", "Niepoprawna kwota", "error");
-            return;
-        }
 
         try {
             setLoading(true);
-            const token = await getToken();
+            const token = requireToken("Użytkownik nie jest zalogowany");
             if (!token) {
-                showToast("Błąd", "Użytkownik nie jest zalogowany", "error");
                 return;
             }
 
             const profile = await getProfile(token);
-            const email = profile.email;
             const returnUrl =
                 Platform.OS === "web"
                     ? undefined
                     : Linking.createURL("/payu-result");
-            const result = (await createPayment(
+            const result = await createPayment(
                 value,
-                email,
+                profile.email,
                 token,
                 returnUrl
-            )) as { redirectUrl?: string; externalOrderId?: string };
+            );
 
-            if (result?.redirectUrl) {
-                if (Platform.OS === "web") {
-                    if (typeof window !== "undefined") {
-                        window.location.assign(result.redirectUrl);
-                        return;
-                    }
-                } else {
-                    await WebBrowser.openAuthSessionAsync(
-                        result.redirectUrl,
-                        returnUrl
-                    );
-                }
-                await Promise.all([
-                    refreshDashboard({ silent: true }),
-                    refreshMessages({ silent: true, skipToast: true }),
-                ]);
-                showToast(
-                    "Informacja",
-                    result.externalOrderId
-                        ? "Płatność została rozpoczęta. Po powrocie status zostanie potwierdzony."
-                        : "Status doładowania został odświeżony.",
-                    "info"
-                );
-            } else {
+            if (!result.redirectUrl) {
                 showToast(
                     "Błąd",
-                    "Brak adresu przekierowania z PayU. Sprawdź konfigurację backendu."
-                    ,
+                    "Brak adresu przekierowania z PayU. Sprawdź konfigurację backendu.",
                     "error"
                 );
+                return;
             }
+
+            if (Platform.OS === "web") {
+                if (typeof window !== "undefined") {
+                    window.location.assign(result.redirectUrl);
+                    return;
+                }
+            } else {
+                const authResult = await WebBrowser.openAuthSessionAsync(
+                    result.redirectUrl,
+                    returnUrl
+                );
+
+                if (authResult.type === "cancel" || authResult.type === "dismiss") {
+                    showToast("Informacja", "Płatność została anulowana", "info");
+                    return;
+                }
+
+                if (authResult.type === "success" && authResult.url) {
+                    const parsed = Linking.parse(authResult.url);
+                    const extOrderId = parsed.queryParams?.extOrderId;
+
+                    if (typeof extOrderId === "string" && extOrderId.trim()) {
+                        router.push({
+                            pathname: "/payu-result",
+                            params: { extOrderId: extOrderId.trim() },
+                        });
+                        return;
+                    }
+                }
+            }
+
+            await Promise.all([
+                refreshDashboard({ silent: true }),
+                refreshMessages({ silent: true, skipToast: true }),
+            ]);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            showToast(
+                "Informacja",
+                result.externalOrderId
+                    ? "Płatność została rozpoczęta. Po powrocie status zostanie potwierdzony."
+                    : "Status doładowania został odświeżony.",
+                "info"
+            );
         } catch (error: unknown) {
+            logError("payu.createPayment", error);
             showToast(
                 "Błąd",
                 getErrorMessage(error, "Nie udało się utworzyć płatności PayU"),
                 "error"
             );
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -124,6 +154,7 @@ export default function PayuScreen() {
                         keyboardType="decimal-pad"
                         value={amount}
                         onChangeText={setAmount}
+                        editable={!loading}
                     />
                     <AppButton
                         title={loading ? "Przekierowanie..." : "Zapłać przez PayU"}
@@ -163,10 +194,10 @@ const styles = StyleSheet.create({
         ...theme.shadows.md,
     },
     notice: {
-        backgroundColor: "#fff8e1",
+        backgroundColor: theme.colors.noticeBackground,
         borderRadius: theme.radius.md,
         borderWidth: 1,
-        borderColor: "#ffe082",
+        borderColor: theme.colors.noticeBorder,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.md,
     },
@@ -179,6 +210,6 @@ const styles = StyleSheet.create({
     noticeText: {
         fontSize: 13,
         lineHeight: 18,
-        color: "#6d4c41",
+        color: theme.colors.noticeText,
     },
 });

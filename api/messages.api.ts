@@ -1,85 +1,147 @@
-import { apiRequest } from "./api";
+import { endpoints } from "./endpoints";
+import { httpClient } from "./httpClient";
+import {
+    assertNonEmptyString,
+    assertResourceId,
+    assertToken,
+} from "./validation";
+import type {
+    ChatMessage,
+    ContactSearchResult,
+    ConversationSummary,
+} from "@/types/message";
 
-export const getConversations = (token: string) =>
-    apiRequest("/messages/conversations", "GET", undefined, token);
+export async function getConversations(
+    token: string
+): Promise<ConversationSummary[]> {
+    assertToken(token);
 
-export const getConversationMessages = (
+    return httpClient.get<ConversationSummary[]>(
+        endpoints.messages.conversations(),
+        token
+    );
+}
+
+export async function getConversationMessages(
     conversationId: string,
     token: string
-) =>
-    apiRequest(
-        `/messages/conversations/${conversationId}/messages`,
-        "GET",
-        undefined,
+): Promise<ChatMessage[]> {
+    assertToken(token);
+    assertResourceId(conversationId, "Identyfikator rozmowy");
+
+    return httpClient.get<ChatMessage[]>(
+        endpoints.messages.conversationMessages(conversationId),
         token
     );
+}
 
-export const createDirectConversation = (login: string, token: string) =>
-    apiRequest(
-        "/messages/conversations/direct",
-        "POST",
-        { login },
+export async function createDirectConversation(
+    login: string,
+    token: string
+): Promise<ConversationSummary> {
+    assertToken(token);
+    assertNonEmptyString(login, "Login");
+
+    return httpClient.post<ConversationSummary>(
+        endpoints.messages.directConversation(),
+        { login: login.trim() },
         token
     );
+}
 
-export const sendConversationMessage = (
+export async function sendConversationMessage(
     conversationId: string,
     content: string,
     token: string,
     title?: string
-) =>
-    apiRequest(
-        `/messages/conversations/${conversationId}/messages`,
-        "POST",
-        title ? { content, title } : { content },
+): Promise<ChatMessage> {
+    assertToken(token);
+    assertResourceId(conversationId, "Identyfikator rozmowy");
+    assertNonEmptyString(content, "Treść wiadomości");
+
+    const body: Record<string, unknown> = title
+        ? { content: content.trim(), title: title.trim() }
+        : { content: content.trim() };
+
+    return httpClient.post<ChatMessage>(
+        endpoints.messages.conversationMessages(conversationId),
+        body,
         token
     );
+}
 
-export const markConversationRead = (
+export async function markConversationRead(
     conversationId: string,
     token: string
-) =>
-    apiRequest(
-        `/messages/conversations/${conversationId}/read`,
-        "PATCH",
+): Promise<void> {
+    assertToken(token);
+    assertResourceId(conversationId, "Identyfikator rozmowy");
+
+    await httpClient.patch(
+        endpoints.messages.markRead(conversationId),
         {},
         token
     );
+}
 
-export const deleteConversationMessage = (
+export async function deleteConversationMessage(
     messageId: string,
     token: string
-) =>
-    apiRequest(`/messages/messages/${messageId}`, "DELETE", {}, token);
+): Promise<void> {
+    assertToken(token);
+    assertResourceId(messageId, "Identyfikator wiadomości");
 
-export const clearConversation = (
-    conversationId: string,
-    token: string
-) =>
-    apiRequest(
-        `/messages/conversations/${conversationId}/messages`,
-        "DELETE",
+    await httpClient.delete(
+        endpoints.messages.deleteMessage(messageId),
         {},
         token
     );
+}
 
-export const searchContacts = (query: string, token: string) =>
-    apiRequest(
-        `/messages/contacts?query=${encodeURIComponent(query)}`,
-        "GET",
-        undefined,
+export async function clearConversation(
+    conversationId: string,
+    token: string
+): Promise<void> {
+    assertToken(token);
+    assertResourceId(conversationId, "Identyfikator rozmowy");
+
+    await httpClient.delete(
+        endpoints.messages.conversationMessages(conversationId),
+        {},
         token
     );
+}
 
-export const sendMessage = (
+export async function searchContacts(
+    query: string,
+    token: string
+): Promise<ContactSearchResult[]> {
+    assertToken(token);
+
+    return httpClient.get<ContactSearchResult[]>(
+        endpoints.messages.contacts(query),
+        token
+    );
+}
+
+export async function sendMessage(
     receiverLogin: string,
     title: string,
     content: string,
     token: string
-) =>
-    apiRequest(
-        "/messages",
-        "POST",
-        { receiverLogin, title, content },
+): Promise<ChatMessage> {
+    assertToken(token);
+    assertNonEmptyString(receiverLogin, "Login odbiorcy");
+    assertNonEmptyString(title, "Tytuł");
+    assertNonEmptyString(content, "Treść");
+
+    return httpClient.post<ChatMessage>(
+        endpoints.messages.root(),
+        {
+            receiverLogin: receiverLogin.trim(),
+            title: title.trim(),
+            content: content.trim(),
+        },
         token
     );
+}

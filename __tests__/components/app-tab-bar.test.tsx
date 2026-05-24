@@ -1,11 +1,13 @@
 import React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { Animated } from "react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 jest.mock("@/providers/AppProvider", () => ({
-  useAppState: jest.fn(),
+  useProfile: jest.fn(),
+  useMessages: jest.fn(),
 }));
 
-import { useAppState } from "@/providers/AppProvider";
+import { useMessages, useProfile } from "@/providers/AppProvider";
 import AppTabBar from "@/components/AppTabBar";
 
 function createProps(activeRouteName: string) {
@@ -44,8 +46,10 @@ describe("AppTabBar", () => {
   });
 
   it("renderuje główne zakładki i badge wiadomości", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useProfile as jest.Mock).mockReturnValue({
       profile: { role: "user" },
+    });
+    (useMessages as jest.Mock).mockReturnValue({
       unreadMessages: 12,
     });
 
@@ -66,8 +70,10 @@ describe("AppTabBar", () => {
   });
 
   it("pozwala adminowi wejść do dodatkowej zakładki", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useProfile as jest.Mock).mockReturnValue({
       profile: { role: "admin" },
+    });
+    (useMessages as jest.Mock).mockReturnValue({
       unreadMessages: 1,
     });
 
@@ -80,9 +86,23 @@ describe("AppTabBar", () => {
     expect(props.navigation.navigate).toHaveBeenCalledWith("admin");
   });
 
-  it("obsługuje brak jednej z głównych tras oraz zamknięcie menu", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+  it("obsługuje brak jednej z głównych tras oraz zamknięcie menu", async () => {
+    jest
+      .spyOn(Animated, "timing")
+      .mockImplementation((value, config) => ({
+        start: (callback?: (result: { finished: boolean }) => void) => {
+          value.setValue(config.toValue as number);
+          callback?.({ finished: true });
+        },
+        stop: jest.fn(),
+        reset: jest.fn(),
+      }));
+
+    jest.useFakeTimers();
+    (useProfile as jest.Mock).mockReturnValue({
       profile: { role: "user" },
+    });
+    (useMessages as jest.Mock).mockReturnValue({
       unreadMessages: 0,
     });
 
@@ -97,7 +117,7 @@ describe("AppTabBar", () => {
       (route: { name: string }) => route.name === "profile"
     );
 
-    const { getByText, queryByText } = render(<AppTabBar {...props} />);
+    const { getByTestId, getByText, queryByText } = render(<AppTabBar {...props} />);
 
     expect(queryByText("Doładuj")).toBeNull();
     fireEvent.press(getByText("Start"));
@@ -105,7 +125,9 @@ describe("AppTabBar", () => {
 
     fireEvent.press(getByText("Więcej"));
     expect(getByText("Więcej funkcji")).toBeTruthy();
-    fireEvent.press(getByText("Szybki dostęp do pozostałych modułów"));
+    fireEvent.press(getByTestId("app-tabbar-menu-backdrop"));
     expect(queryByText("Więcej funkcji")).toBeNull();
+    jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 });

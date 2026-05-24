@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
     Animated,
     FlatList,
+    ListRenderItem,
     Pressable,
     StyleSheet,
     Text,
@@ -11,8 +11,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { MESSAGE_LIMITS } from "@/constants/messageLimits";
 import { theme } from "@/constants/theme";
 import type { ChatMessage, ConversationSummary } from "@/types/message";
+import { confirmAction } from "@/utils/confirmAction";
+import { formatTimestamp } from "@/utils/formatTimestamp";
 
 type Props = {
     conversation: ConversationSummary | null;
@@ -25,23 +28,12 @@ type Props = {
     onClearConversation: () => Promise<void>;
 };
 
-function formatTimestamp(timestamp?: string) {
-    if (!timestamp) {
-        return "";
-    }
-
-    return new Intl.DateTimeFormat("pl-PL", {
-        hour: "2-digit",
-        minute: "2-digit",
-    }).format(new Date(timestamp));
-}
-
 function MessageBubble({
     item,
     onDelete,
 }: {
     item: ChatMessage;
-    onDelete: (messageId: string) => void;
+    onDelete: (messageId: string) => void | Promise<void>;
 }) {
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(10)).current;
@@ -70,7 +62,9 @@ function MessageBubble({
             ]}
         >
             <Pressable
-                onLongPress={() => onDelete(item._id)}
+                onLongPress={() => {
+                    void onDelete(item._id);
+                }}
                 style={[
                     styles.bubble,
                     item.isOwn ? styles.bubbleOwn : styles.bubbleOther,
@@ -129,7 +123,7 @@ export default function ChatConversationView({
 
     const handleSend = async () => {
         const trimmed = draft.trim();
-        if (!trimmed) {
+        if (!trimmed || trimmed.length > MESSAGE_LIMITS.content.max) {
             return;
         }
 
@@ -142,39 +136,43 @@ export default function ChatConversationView({
         }
     };
 
-    const handleDelete = (messageId: string) => {
-        Alert.alert(
-            "Usuń wiadomość",
-            "Czy na pewno chcesz usunąć tę wiadomość z rozmowy?",
-            [
-                { text: "Anuluj", style: "cancel" },
-                {
-                    text: "Usuń",
-                    style: "destructive",
-                    onPress: () => {
-                        onDeleteMessage(messageId);
-                    },
-                },
-            ]
-        );
-    };
+    const handleDelete = useCallback(
+        async (messageId: string) => {
+            const confirmed = await confirmAction({
+                title: "Usuń wiadomość",
+                message: "Czy na pewno chcesz usunąć tę wiadomość z rozmowy?",
+                confirmLabel: "Usuń",
+                destructive: true,
+            });
 
-    const handleClearConversation = () => {
-        Alert.alert(
-            "Wyczyść rozmowę",
-            "Ta operacja usunie historię rozmowy z Twojego widoku.",
-            [
-                { text: "Anuluj", style: "cancel" },
-                {
-                    text: "Wyczyść",
-                    style: "destructive",
-                    onPress: () => {
-                        onClearConversation();
-                    },
-                },
-            ]
-        );
-    };
+            if (!confirmed) {
+                return;
+            }
+
+            await onDeleteMessage(messageId);
+        },
+        [onDeleteMessage]
+    );
+
+    const handleClearConversation = useCallback(async () => {
+        const confirmed = await confirmAction({
+            title: "Wyczyść rozmowę",
+            message: "Ta operacja usunie historię rozmowy z Twojego widoku.",
+            confirmLabel: "Wyczyść",
+            destructive: true,
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        await onClearConversation();
+    }, [onClearConversation]);
+
+    const renderMessage = useCallback<ListRenderItem<ChatMessage>>(
+        ({ item }) => <MessageBubble item={item} onDelete={handleDelete} />,
+        [handleDelete]
+    );
 
     if (!conversation) {
         return (
@@ -232,9 +230,7 @@ export default function ChatConversationView({
                 ref={listRef}
                 data={messages}
                 keyExtractor={(item) => item._id}
-                renderItem={({ item }) => (
-                    <MessageBubble item={item} onDelete={handleDelete} />
-                )}
+                renderItem={renderMessage}
                 contentContainerStyle={styles.messagesContent}
                 ListEmptyComponent={
                     <View style={styles.emptyConversation}>
@@ -255,6 +251,7 @@ export default function ChatConversationView({
                     value={draft}
                     onChangeText={setDraft}
                     multiline
+                    maxLength={MESSAGE_LIMITS.content.max}
                     style={styles.input}
                 />
                 <Pressable

@@ -9,9 +9,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-import { useAppState } from "@/providers/AppProvider";
+import { useToast } from "@/providers/AppProvider";
 import type { MessageType } from "@/types/message";
 import { theme } from "@/constants/theme";
+
+const TOAST_AUTO_DISMISS_MS = 4000;
 
 function getToastAccent(type: MessageType) {
     if (type === "success") {
@@ -48,7 +50,7 @@ function ToastCard({
     message: string;
     type: MessageType;
 }) {
-    const { dismissToast } = useAppState();
+    const { dismissToast } = useToast();
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(-12)).current;
 
@@ -66,6 +68,14 @@ function ToastCard({
             }),
         ]).start();
     }, [opacity, translateY]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            dismissToast(id);
+        }, TOAST_AUTO_DISMISS_MS);
+
+        return () => clearTimeout(timer);
+    }, [dismissToast, id]);
 
     return (
         <Animated.View
@@ -105,7 +115,7 @@ function ToastCard({
 }
 
 export default function ToastHost() {
-    const { toasts } = useAppState();
+    const { toasts } = useToast();
 
     if (toasts.length === 0) {
         return null;

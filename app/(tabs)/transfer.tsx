@@ -10,24 +10,45 @@ import {
 import { useState } from "react";
 import { router } from "expo-router";
 
-import { getToken } from "@/api/authStorage";
-import { getErrorMessage } from "@/utils/errorMessage";
-import { apiRequest } from "@/api/api";
+import { createTransfer } from "@/api/transactions.api";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
+import { AUTH_FIELD_LIMITS } from "@/constants/authLimits";
+import { useIsMounted } from "@/hooks/useIsMounted";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
-import { useAppState } from "@/providers/AppProvider";
+import { useDashboard, useMessages, useToast } from "@/providers/AppProvider";
+import {
+    getErrorMessage,
+    isInsufficientFundsError,
+} from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function TransferScreen() {
     const [receiverLogin, setReceiverLogin] = useState("");
     const [amount, setAmount] = useState("");
     const [loading, setLoading] = useState(false);
-    const { refreshDashboard, refreshMessages, showToast } = useAppState();
+    const isMountedRef = useIsMounted();
+    const { requireToken } = useRequireAuthToken();
+    const { refreshDashboard } = useDashboard();
+    const { refreshMessages } = useMessages();
+    const { showToast } = useToast();
 
     const handleTransfer = async () => {
-        if (!receiverLogin || !amount) {
+        const trimmedReceiver = receiverLogin.trim();
+
+        if (!trimmedReceiver || !amount.trim()) {
             showToast("Błąd", "Wszystkie pola są wymagane", "error");
+            return;
+        }
+
+        if (trimmedReceiver.length > AUTH_FIELD_LIMITS.login.max) {
+            showToast(
+                "Błąd",
+                `Login odbiorcy może mieć maksymalnie ${AUTH_FIELD_LIMITS.login.max} znaków`,
+                "error"
+            );
             return;
         }
 
@@ -39,41 +60,42 @@ export default function TransferScreen() {
 
         try {
             setLoading(true);
-            const token = await getToken();
+            const token = requireToken("Użytkownik nie jest zalogowany");
             if (!token) {
-                showToast("Błąd", "Użytkownik nie jest zalogowany", "error");
                 return;
             }
 
-            await apiRequest(
-                "/transactions/bank-transfer",
-                "POST",
-                {
-                    receiverAccount: receiverLogin,
-                    amount: transferAmount,
-                },
-                token
-            );
+            await createTransfer(trimmedReceiver, transferAmount, token);
 
             await Promise.all([
                 refreshDashboard({ silent: true }),
                 refreshMessages({ silent: true, skipToast: true }),
             ]);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             showToast("Sukces", "Przelew zakończony sukcesem", "success");
             setReceiverLogin("");
             setAmount("");
             router.push("/(tabs)/history");
         } catch (error: unknown) {
-            const message = getErrorMessage(error, "Nie udało się wykonać przelewu");
-            showToast(
-                "Błąd",
-                message.toLowerCase().includes("insufficient")
-                    ? "Niewystarczające środki na koncie – doładuj konto"
-                    : message,
-                "error"
-            );
+            logError("transfer.create", error);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            const message = isInsufficientFundsError(error)
+                ? "Niewystarczające środki na koncie – doładuj konto"
+                : getErrorMessage(error, "Nie udało się wykonać przelewu");
+
+            showToast("Błąd", message, "error");
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -103,6 +125,8 @@ export default function TransferScreen() {
                             onChangeText={setReceiverLogin}
                             autoCapitalize="none"
                             autoCorrect={false}
+                            maxLength={AUTH_FIELD_LIMITS.login.max}
+                            editable={!loading}
                         />
                         <AppInput
                             label="Kwota (PLN)"
@@ -110,6 +134,7 @@ export default function TransferScreen() {
                             keyboardType="decimal-pad"
                             value={amount}
                             onChangeText={setAmount}
+                            editable={!loading}
                         />
                         <AppButton
                             title={loading ? "Wysyłanie..." : "Wyślij przelew"}

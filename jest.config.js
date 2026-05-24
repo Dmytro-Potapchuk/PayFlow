@@ -4,6 +4,7 @@ module.exports = {
   testMatch: ["**/__tests__/**/*.test.ts?(x)"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^expo-secure-store$": "<rootDir>/__mocks__/expo-secure-store.ts",
   },
   collectCoverageFrom: [
     "api/**/*.ts",
@@ -13,7 +14,7 @@ module.exports = {
     "components/AppInput.tsx",
     "components/AppTabBar.tsx",
     "components/BalanceCard.tsx",
-    "components/PwaInstallNotice.tsx",
+    "components/IosHomeScreenNotice.tsx",
     "components/ToastHost.tsx",
     "constants/keyboard.ts",
     "utils/**/*.ts",

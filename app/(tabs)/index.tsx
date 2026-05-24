@@ -16,15 +16,21 @@ import { Ionicons } from "@expo/vector-icons";
 import BalanceCard from "@/components/BalanceCard";
 import TransactionItem from "@/components/TransactionItem";
 import AppButton from "@/components/AppButton";
-import PwaInstallNotice from "@/components/PwaInstallNotice";
+import IosHomeScreenNotice from "@/components/IosHomeScreenNotice";
+import { isCompactWidth } from "@/constants/layout";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useIsMounted } from "@/hooks/useIsMounted";
+import { useDashboard, useMessages } from "@/providers/AppProvider";
+import { logError } from "@/utils/logError";
 
 export default function DashboardScreen() {
     const [refreshing, setRefreshing] = useState(false);
-    const { dashboard, refreshDashboard, unreadMessages } = useAppState();
+    const { dashboard, refreshDashboard } = useDashboard();
+    const { unreadMessages } = useMessages();
     const { width } = useWindowDimensions();
-    const isCompact = width <= 430;
+    const isCompact = isCompactWidth(width);
+    const isMountedRef = useIsMounted();
+    const recentTransactions = dashboard.recentTransactions ?? [];
 
     useFocusEffect(
         useCallback(() => {
@@ -34,9 +40,17 @@ export default function DashboardScreen() {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await refreshDashboard({ silent: true });
-        setRefreshing(false);
-    }, [refreshDashboard]);
+
+        try {
+            await refreshDashboard({ silent: true });
+        } catch (error: unknown) {
+            logError("dashboard.refresh", error);
+        } finally {
+            if (isMountedRef.current) {
+                setRefreshing(false);
+            }
+        }
+    }, [isMountedRef, refreshDashboard]);
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -77,7 +91,7 @@ export default function DashboardScreen() {
                     </Text>
                 </View>
 
-                <PwaInstallNotice compact={isCompact} />
+                <IosHomeScreenNotice compact={isCompact} />
 
                 <BalanceCard
                     balance={dashboard.balance}
@@ -105,8 +119,8 @@ export default function DashboardScreen() {
                         <Text style={styles.transactionsPanelHint}>Ostatnie operacje na koncie</Text>
                     </View>
                     <View style={styles.transactionsList}>
-                        {dashboard.recentTransactions.length > 0 ? (
-                            dashboard.recentTransactions.map((item) => (
+                        {recentTransactions.length > 0 ? (
+                            recentTransactions.map((item) => (
                                 <TransactionItem key={item._id} transaction={item} />
                             ))
                         ) : (
@@ -154,10 +168,10 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
     },
     notice: {
-        backgroundColor: "#fff8e1",
+        backgroundColor: theme.colors.noticeBackground,
         borderRadius: theme.radius.lg,
         borderWidth: 1,
-        borderColor: "#ffe082",
+        borderColor: theme.colors.noticeBorder,
         padding: theme.spacing.md,
     },
     noticeTitle: {
@@ -169,7 +183,7 @@ const styles = StyleSheet.create({
     noticeText: {
         fontSize: 13,
         lineHeight: 18,
-        color: "#6d4c41",
+        color: theme.colors.noticeText,
     },
     greeting: {
         ...theme.typography.h1,

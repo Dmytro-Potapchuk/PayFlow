@@ -6,45 +6,81 @@ import {
     RefreshControl,
     SafeAreaView,
 } from "react-native";
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { getToken } from "@/api/authStorage";
-import { apiRequest } from "@/api/api";
+
+import { getHistory } from "@/api/transactions.api";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import { Transaction } from "@/types/transaction";
 import TransactionItem from "@/components/TransactionItem";
 import { theme } from "@/constants/theme";
+import { logError } from "@/utils/logError";
 
 export default function HistoryScreen() {
+    const { requireToken } = useRequireAuthToken();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [errorText, setErrorText] = useState<string | null>(null);
+    const isMountedRef = useRef(true);
 
     const loadHistory = useCallback(async () => {
-        const token = await getToken();
-        const data = await apiRequest<Transaction[]>(
-            "/transactions/history",
-            "GET",
-            undefined,
-            token || ""
-        );
-        setTransactions(Array.isArray(data) ? data : []);
-    }, []);
+        try {
+            const token = requireToken();
 
-    useEffect(() => {
-        setLoading(true);
-        loadHistory().finally(() => setLoading(false));
-    }, [loadHistory]);
+            if (!token) {
+                if (isMountedRef.current) {
+                    setTransactions([]);
+                    setErrorText("Brak sesji – zaloguj się ponownie.");
+                }
+                return;
+            }
+
+            const data = await getHistory(token);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            setTransactions(data);
+            setErrorText(null);
+        } catch (error: unknown) {
+            logError("history.load", error);
+
+            if (isMountedRef.current) {
+                setTransactions([]);
+                setErrorText("Nie udało się pobrać historii transakcji.");
+            }
+        }
+    }, [requireToken]);
 
     useFocusEffect(
         useCallback(() => {
-            loadHistory();
+            isMountedRef.current = true;
+            setLoading(true);
+
+            loadHistory().finally(() => {
+                if (isMountedRef.current) {
+                    setLoading(false);
+                }
+            });
+
+            return () => {
+                isMountedRef.current = false;
+            };
         }, [loadHistory])
     );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await loadHistory();
-        setRefreshing(false);
+
+        try {
+            await loadHistory();
+        } finally {
+            if (isMountedRef.current) {
+                setRefreshing(false);
+            }
+        }
     }, [loadHistory]);
 
     return (
@@ -71,7 +107,7 @@ export default function HistoryScreen() {
                         contentContainerStyle={styles.listContent}
                         ListEmptyComponent={
                             <Text style={styles.empty}>
-                                Brak transakcji
+                                {errorText ?? "Brak transakcji"}
                             </Text>
                         }
                         refreshControl={

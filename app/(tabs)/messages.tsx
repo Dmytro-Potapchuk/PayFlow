@@ -11,9 +11,12 @@ import { router } from "expo-router";
 import ChatConversationView from "@/components/messages/ChatConversationView";
 import ConversationListPanel from "@/components/messages/ConversationListPanel";
 import NewConversationModal from "@/components/messages/NewConversationModal";
-import { useAppState } from "@/providers/AppProvider";
+import { isMessagesWideLayout } from "@/constants/layout";
+import { useMessages, useToast } from "@/providers/AppProvider";
 import { theme } from "@/constants/theme";
 import type { ContactSearchResult } from "@/types/message";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function MessagesScreen() {
     const [listSearch, setListSearch] = useState("");
@@ -22,7 +25,7 @@ export default function MessagesScreen() {
     const [contactResults, setContactResults] = useState<ContactSearchResult[]>([]);
     const [contactLoading, setContactLoading] = useState(false);
     const { width } = useWindowDimensions();
-    const isWide = width >= 960;
+    const isWide = isMessagesWideLayout(width);
     const {
         activeConversation,
         activeConversationId,
@@ -36,20 +39,34 @@ export default function MessagesScreen() {
         refreshConversations,
         searchConversationContacts,
         sendConversation,
-        showToast,
-    } = useAppState();
+    } = useMessages();
+    const { showToast } = useToast();
 
     useFocusEffect(
         useCallback(() => {
-            refreshConversations({ silent: true, skipToast: true });
+            refreshConversations({ silent: true, skipToast: true }).catch(
+                (error: unknown) => {
+                    logError("messages.refreshConversations", error);
+                }
+            );
         }, [refreshConversations])
     );
 
-    useEffect(() => {
-        if (isWide && !activeConversationId && conversations.length > 0) {
-            openConversation(conversations[0]._id, { markRead: true });
+    const openFirstConversationOnWideLayout = useCallback(async () => {
+        if (!isWide || activeConversationId || conversations.length === 0) {
+            return;
+        }
+
+        try {
+            await openConversation(conversations[0]._id, { markRead: true });
+        } catch (error: unknown) {
+            logError("messages.openFirstConversation", error);
         }
     }, [activeConversationId, conversations, isWide, openConversation]);
+
+    useEffect(() => {
+        openFirstConversationOnWideLayout();
+    }, [openFirstConversationOnWideLayout]);
 
     useEffect(() => {
         if (!isComposerOpen) {
@@ -58,6 +75,8 @@ export default function MessagesScreen() {
 
         let cancelled = false;
 
+        const debounceMs = contactQuery.trim() ? 250 : 0;
+
         const timeout = setTimeout(async () => {
             setContactLoading(true);
             try {
@@ -65,12 +84,13 @@ export default function MessagesScreen() {
                 if (!cancelled) {
                     setContactResults(results);
                 }
-            } catch {
+            } catch (error: unknown) {
+                logError("messages.searchContacts", error);
                 if (!cancelled) {
                     setContactResults([]);
                     showToast(
                         "Błąd",
-                        "Nie udało się wyszukać kontaktów",
+                        getErrorMessage(error, "Nie udało się pobrać listy użytkowników"),
                         "error"
                     );
                 }
@@ -79,7 +99,7 @@ export default function MessagesScreen() {
                     setContactLoading(false);
                 }
             }
-        }, 200);
+        }, debounceMs);
 
         return () => {
             cancelled = true;
@@ -101,40 +121,105 @@ export default function MessagesScreen() {
         );
     }, [conversations, listSearch]);
 
-    const handleOpenConversation = async (conversationId: string) => {
-        await openConversation(conversationId, { markRead: true });
+    const handleOpenConversation = useCallback(
+        async (conversationId: string) => {
+            try {
+                await openConversation(conversationId, { markRead: true });
 
-        if (!isWide) {
-            router.push({
-                pathname: "/chat/[conversationId]",
-                params: { conversationId },
-            });
-        }
-    };
+                if (!isWide) {
+                    router.push({
+                        pathname: "/chat/[conversationId]",
+                        params: { conversationId },
+                    });
+                }
+            } catch (error: unknown) {
+                logError("messages.openConversation", error);
+                showToast(
+                    "Błąd",
+                    getErrorMessage(error, "Nie udało się otworzyć rozmowy"),
+                    "error"
+                );
+            }
+        },
+        [isWide, openConversation, showToast]
+    );
 
-    const handleCreateConversation = async (contact: ContactSearchResult) => {
-        try {
-            const conversation = await createConversation(contact.login);
+    const handleCreateConversation = useCallback(
+        async (contact: ContactSearchResult) => {
+            try {
+                const conversation = await createConversation(contact.login);
 
-            if (!conversation) {
+                if (!conversation) {
+                    showToast("Błąd", "Nie udało się utworzyć rozmowy", "error");
+                    return;
+                }
+
+                setIsComposerOpen(false);
+                setContactQuery("");
+                setContactResults([]);
+                await openConversation(conversation._id, { markRead: true });
+
+                if (!isWide) {
+                    router.push({
+                        pathname: "/chat/[conversationId]",
+                        params: { conversationId: conversation._id },
+                    });
+                }
+            } catch (error: unknown) {
+                logError("messages.createConversation", error);
+                showToast(
+                    "Błąd",
+                    getErrorMessage(error, "Nie udało się utworzyć rozmowy"),
+                    "error"
+                );
+            }
+        },
+        [createConversation, isWide, openConversation, showToast]
+    );
+
+    const handleSendMessage = useCallback(
+        async (content: string) => {
+            if (!activeConversation) {
                 return;
             }
 
-            setIsComposerOpen(false);
-            setContactQuery("");
-            setContactResults([]);
-            await openConversation(conversation._id, { markRead: true });
-
-            if (!isWide) {
-                router.push({
-                    pathname: "/chat/[conversationId]",
-                    params: { conversationId: conversation._id },
-                });
+            try {
+                await sendConversation(activeConversation._id, content);
+            } catch (error: unknown) {
+                logError("messages.sendConversation", error);
+                showToast(
+                    "Błąd",
+                    getErrorMessage(error, "Nie udało się wysłać wiadomości"),
+                    "error"
+                );
             }
-        } catch {
-            showToast("Błąd", "Nie udało się utworzyć rozmowy", "error");
+        },
+        [activeConversation, sendConversation, showToast]
+    );
+
+    const handleClearConversation = useCallback(async () => {
+        if (!activeConversation) {
+            return;
         }
-    };
+
+        try {
+            await clearConversationThread(activeConversation._id);
+            showToast("Sukces", "Historia rozmowy została wyczyszczona", "success");
+        } catch (error: unknown) {
+            logError("messages.clearConversation", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się wyczyścić rozmowy"),
+                "error"
+            );
+        }
+    }, [activeConversation, clearConversationThread, showToast]);
+
+    const closeComposer = useCallback(() => {
+        setIsComposerOpen(false);
+        setContactQuery("");
+        setContactResults([]);
+    }, []);
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -159,19 +244,9 @@ export default function MessagesScreen() {
                             messages={activeMessages}
                             isWide
                             isSocketConnected={isSocketConnected}
-                            onSend={async (content) => {
-                                if (!activeConversation) {
-                                    return;
-                                }
-                                await sendConversation(activeConversation._id, content);
-                            }}
+                            onSend={handleSendMessage}
                             onDeleteMessage={deleteConversationItem}
-                            onClearConversation={async () => {
-                                if (!activeConversation) {
-                                    return;
-                                }
-                                await clearConversationThread(activeConversation._id);
-                            }}
+                            onClearConversation={handleClearConversation}
                         />
                     </View>
                 ) : null}
@@ -180,10 +255,7 @@ export default function MessagesScreen() {
                 visible={isComposerOpen}
                 query={contactQuery}
                 onChangeQuery={setContactQuery}
-                onClose={() => {
-                    setIsComposerOpen(false);
-                    setContactQuery("");
-                }}
+                onClose={closeComposer}
                 onSelectContact={handleCreateConversation}
                 contacts={contactResults}
                 loading={contactLoading}

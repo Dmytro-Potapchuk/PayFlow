@@ -7,120 +7,159 @@ import {
     TouchableOpacity,
     SafeAreaView,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { getRates, buyCurrency } from "@/api/currency.api";
-import { getToken } from "@/api/authStorage";
+import type { CurrencyCode } from "@/types/api.types";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import { getErrorMessage } from "@/utils/errorMessage";
+import {
+    buildConversionResult,
+    canBuyCurrency,
+    validatePlnAmount,
+} from "@/utils/currencyForm";
+import type { NbpRate } from "@/utils/nbpRates";
+import { logError } from "@/utils/logError";
+import { useIsMounted } from "@/hooks/useIsMounted";
 import AppInput from "@/components/AppInput";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
-import { useAppState } from "@/providers/AppProvider";
-
-interface Rate {
-    code: string;
-    currency: string;
-    mid: number;
-}
+import { useDashboard, useMessages, useToast } from "@/providers/AppProvider";
 
 export default function CurrencyScreen() {
-    const [rates, setRates] = useState<Rate[]>([]);
+    const [rates, setRates] = useState<NbpRate[]>([]);
     const [loading, setLoading] = useState(false);
     const [amountPln, setAmountPln] = useState("");
-    const [selected, setSelected] = useState<Rate | null>(null);
+    const [selected, setSelected] = useState<NbpRate | null>(null);
     const [result, setResult] = useState<string | null>(null);
     const [buying, setBuying] = useState(false);
-    const { refreshDashboard, refreshMessages, showToast } = useAppState();
+    const { refreshDashboard } = useDashboard();
+    const { refreshMessages } = useMessages();
+    const { showToast } = useToast();
+    const isMountedRef = useIsMounted();
+    const { requireToken } = useRequireAuthToken();
 
-    useEffect(() => {
-        loadRates();
-    }, []);
-
-    const loadRates = async () => {
+    const loadRates = useCallback(async () => {
         try {
             setLoading(true);
             const data = await getRates();
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             setRates(data);
-        } catch {
-            showToast("Błąd", "Nie udało się pobrać kursów walut", "error");
+
+            if (data.length === 0) {
+                showToast("Błąd", "Brak dostępnych kursów walut", "error");
+            }
+        } catch (error: unknown) {
+            logError("currency.loadRates", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się pobrać kursów walut"),
+                "error"
+            );
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [isMountedRef, showToast]);
+
+    useEffect(() => {
+        loadRates();
+    }, [loadRates]);
 
     const handleConvert = () => {
+        const validationError = validatePlnAmount(amountPln);
+        if (validationError) {
+            showToast("Błąd", validationError, "error");
+            return;
+        }
+
         if (!selected) {
             showToast("Błąd", "Wybierz walutę", "error");
             return;
         }
+
         const amount = Number(amountPln);
-        if (isNaN(amount) || amount <= 0) {
-            showToast("Błąd", "Podaj poprawną kwotę w PLN", "error");
-            return;
-        }
-        const foreignAmount = amount / selected.mid;
-        setResult(`${amount.toFixed(2)} PLN = ${foreignAmount.toFixed(2)} ${selected.code}`);
+        setResult(buildConversionResult(amount, selected));
     };
 
-    const canBuy = selected && (selected.code === "EUR" || selected.code === "USD");
-
     const handleBuy = async () => {
-        if (!canBuy) {
+        if (!canBuyCurrency(selected)) {
             showToast("Błąd", "Kupno możliwe tylko dla EUR lub USD", "error");
             return;
         }
-        const amount = Number(amountPln);
-        if (isNaN(amount) || amount <= 0) {
-            showToast("Błąd", "Podaj poprawną kwotę w PLN", "error");
+
+        const validationError = validatePlnAmount(amountPln);
+        if (validationError) {
+            showToast("Błąd", validationError, "error");
             return;
         }
+
+        const amount = Number(amountPln);
+        const currencyCode = selected.code as CurrencyCode;
+
         try {
             setBuying(true);
-            const token = await getToken();
+            const token = requireToken("Zaloguj się, aby kupić walutę");
             if (!token) {
-                showToast("Błąd", "Zaloguj się, aby kupić walutę", "error");
                 return;
             }
-            const res = await buyCurrency(amount, selected!.code, token);
+
+            const response = await buyCurrency(amount, currencyCode, token);
             await Promise.all([
                 refreshDashboard({ silent: true }),
                 refreshMessages({ silent: true, skipToast: true }),
             ]);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             showToast(
                 "Sukces",
-                `Kupiono ${res.boughtAmount.toFixed(2)} ${res.currencyCode}.`,
+                `Kupiono ${response.boughtAmount.toFixed(2)} ${response.currencyCode}.`,
                 "success"
             );
             setAmountPln("");
             setResult(null);
-        } catch (err: unknown) {
+        } catch (error: unknown) {
+            logError("currency.buy", error);
             showToast(
                 "Błąd",
-                getErrorMessage(err, "Nie udało się kupić waluty"),
+                getErrorMessage(error, "Nie udało się kupić waluty"),
                 "error"
             );
         } finally {
-            setBuying(false);
+            if (isMountedRef.current) {
+                setBuying(false);
+            }
         }
     };
 
-    const renderItem = ({ item }: { item: Rate }) => {
-        const isSelected = selected?.code === item.code;
-        return (
-            <TouchableOpacity
-                style={[styles.rateRow, isSelected && styles.rateRowSelected]}
-                onPress={() => setSelected(item)}
-                activeOpacity={0.7}
-            >
-                <View>
-                    <Text style={styles.rateCode}>{item.code}</Text>
-                    <Text style={styles.rateName}>{item.currency}</Text>
-                </View>
-                <Text style={styles.rateValue}>{item.mid.toFixed(4)} PLN</Text>
-            </TouchableOpacity>
-        );
-    };
+    const renderItem = useCallback(
+        ({ item }: { item: NbpRate }) => {
+            const isSelected = selected?.code === item.code;
+            return (
+                <TouchableOpacity
+                    style={[styles.rateRow, isSelected && styles.rateRowSelected]}
+                    onPress={() => setSelected(item)}
+                    activeOpacity={0.7}
+                >
+                    <View>
+                        <Text style={styles.rateCode}>{item.code}</Text>
+                        <Text style={styles.rateName}>{item.currency}</Text>
+                    </View>
+                    <Text style={styles.rateValue}>{item.mid.toFixed(4)} PLN</Text>
+                </TouchableOpacity>
+            );
+        },
+        [selected?.code]
+    );
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -137,6 +176,7 @@ export default function CurrencyScreen() {
                         keyboardType="decimal-pad"
                         value={amountPln}
                         onChangeText={setAmountPln}
+                        editable={!buying}
                     />
                     {result && (
                         <View style={styles.resultBox}>
@@ -149,10 +189,11 @@ export default function CurrencyScreen() {
                             onPress={handleConvert}
                             variant="outline"
                             style={styles.btn}
+                            disabled={buying}
                         />
-                        {canBuy && (
+                        {canBuyCurrency(selected) && (
                             <AppButton
-                                title={buying ? "..." : "Kup walutę"}
+                                title={buying ? "Kupowanie..." : "Kup walutę"}
                                 onPress={handleBuy}
                                 disabled={buying}
                                 loading={buying}

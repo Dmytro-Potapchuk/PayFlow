@@ -1,19 +1,46 @@
-import { apiRequest } from "./api";
+import { endpoints } from "./endpoints";
+import { httpClient } from "./httpClient";
+import {
+    assertEmail,
+    assertPositiveNumber,
+    assertResourceId,
+    assertToken,
+} from "./validation";
+import type {
+    PayuConfirmPaymentResponse,
+    PayuCreatePaymentResponse,
+} from "@/types/api.types";
 
-export const createPayment = (
+export async function createPayment(
     amount: number,
     email: string,
     token: string,
     continueUrl?: string
-) => {
-    return apiRequest(
-        "/payu/create-payment",
-        "POST",
-        continueUrl ? { amount, email, continueUrl } : { amount, email },
+): Promise<PayuCreatePaymentResponse> {
+    assertToken(token);
+    assertPositiveNumber(amount, "Kwota");
+    assertEmail(email);
+
+    const body: Record<string, unknown> = continueUrl
+        ? { amount, email: email.trim(), continueUrl: continueUrl.trim() }
+        : { amount, email: email.trim() };
+
+    return httpClient.post<PayuCreatePaymentResponse>(
+        endpoints.payu.createPayment(),
+        body,
         token
     );
-};
+}
 
-export const confirmPayment = (externalOrderId: string, token: string) => {
-    return apiRequest(`/payu/confirm/${externalOrderId}`, "GET", undefined, token);
-};
+export async function confirmPayment(
+    externalOrderId: string,
+    token: string
+): Promise<PayuConfirmPaymentResponse> {
+    assertToken(token);
+    assertResourceId(externalOrderId, "Identyfikator zamówienia");
+
+    return httpClient.get<PayuConfirmPaymentResponse>(
+        endpoints.payu.confirm(externalOrderId),
+        token
+    );
+}

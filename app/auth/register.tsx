@@ -10,35 +10,59 @@ import {
 import { useState } from "react";
 import { router } from "expo-router";
 
-import { apiRequest } from "@/api/api";
-import { getErrorMessage } from "@/utils/errorMessage";
+import { register as registerRequest } from "@/api/auth.api";
+import { AUTH_FIELD_LIMITS } from "@/constants/authLimits";
+import { useIsMounted } from "@/hooks/useIsMounted";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
-import { useAppState } from "@/providers/AppProvider";
+import { useToast } from "@/providers/AppProvider";
+import { validateRegisterForm } from "@/utils/authFormValidation";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function RegisterScreen() {
     const [login, setLogin] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const { showToast } = useAppState();
+    const [loading, setLoading] = useState(false);
+    const isMountedRef = useIsMounted();
+    const { showToast } = useToast();
 
     const handleRegister = async () => {
+        const validationError = validateRegisterForm(login, email, password);
+        if (validationError) {
+            showToast("Błąd", validationError, "error");
+            return;
+        }
+
         try {
-            await apiRequest("/auth/register", "POST", {
-                login,
-                email,
-                password,
-            });
+            setLoading(true);
+            await registerRequest(login.trim(), email.trim(), password);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             showToast("Sukces", "Konto utworzone", "success");
             router.replace("/auth/login");
         } catch (error: unknown) {
+            logError("auth.register", error);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             showToast(
                 "Błąd",
                 getErrorMessage(error, "Nie udało się zarejestrować"),
                 "error"
             );
+        } finally {
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -74,6 +98,8 @@ export default function RegisterScreen() {
                             value={login}
                             onChangeText={setLogin}
                             autoCapitalize="none"
+                            maxLength={AUTH_FIELD_LIMITS.login.max}
+                            editable={!loading}
                         />
                         <AppInput
                             placeholder="Email"
@@ -81,23 +107,30 @@ export default function RegisterScreen() {
                             onChangeText={setEmail}
                             keyboardType="email-address"
                             autoCapitalize="none"
+                            maxLength={AUTH_FIELD_LIMITS.email.max}
+                            editable={!loading}
                         />
                         <AppInput
-                            placeholder="Hasło (min. 6 znaków)"
+                            placeholder="Hasło (min. 6 znaków, litera i cyfra)"
                             secureTextEntry
                             isPassword
                             value={password}
                             onChangeText={setPassword}
+                            maxLength={AUTH_FIELD_LIMITS.password.max}
+                            editable={!loading}
                         />
                         <AppButton
-                            title="Zarejestruj się"
+                            title={loading ? "Rejestrowanie..." : "Zarejestruj się"}
                             onPress={handleRegister}
+                            loading={loading}
+                            disabled={loading}
                             style={styles.primaryBtn}
                         />
                         <AppButton
                             title="Masz konto? Zaloguj się"
                             onPress={() => router.back()}
                             variant="outline"
+                            disabled={loading}
                         />
                     </View>
                 </ScrollView>
@@ -125,10 +158,10 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     notice: {
-        backgroundColor: "#fff8e1",
+        backgroundColor: theme.colors.noticeBackground,
         borderRadius: theme.radius.md,
         borderWidth: 1,
-        borderColor: "#ffe082",
+        borderColor: theme.colors.noticeBorder,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.lg,
     },
@@ -141,7 +174,7 @@ const styles = StyleSheet.create({
     noticeText: {
         fontSize: 13,
         lineHeight: 18,
-        color: "#6d4c41",
+        color: theme.colors.noticeText,
     },
     form: {
         backgroundColor: theme.colors.surface,

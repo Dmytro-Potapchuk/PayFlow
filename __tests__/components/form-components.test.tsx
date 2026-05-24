@@ -24,7 +24,7 @@ describe("AppButton", () => {
 
     expect(queryByText("Usuń")).toBeNull();
     expect(UNSAFE_getByType(TouchableOpacity).props.disabled).toBe(true);
-    expect(UNSAFE_getByType(ActivityIndicator).props.color).toBe("#fff");
+    expect(UNSAFE_getByType(ActivityIndicator).props.color).toBe("#ffffff");
   });
 
   it("używa koloru primary dla loadera w wariancie outline", () => {

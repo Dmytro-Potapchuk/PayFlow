@@ -1,5 +1,7 @@
+import { useCallback } from "react";
 import {
     FlatList,
+    ListRenderItem,
     Pressable,
     StyleSheet,
     Text,
@@ -10,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/constants/theme";
 import type { ConversationSummary } from "@/types/message";
+import { formatTimestamp } from "@/utils/formatTimestamp";
 
 type Props = {
     conversations: ConversationSummary[];
@@ -22,21 +25,6 @@ type Props = {
     isSocketConnected: boolean;
 };
 
-function formatTimestamp(timestamp?: string) {
-    if (!timestamp) {
-        return "";
-    }
-
-    const date = new Date(timestamp);
-
-    return new Intl.DateTimeFormat("pl-PL", {
-        hour: "2-digit",
-        minute: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-    }).format(date);
-}
-
 function getInitials(title: string) {
     return title
         .split(" ")
@@ -44,6 +32,53 @@ function getInitials(title: string) {
         .slice(0, 2)
         .map((part) => part[0]?.toUpperCase())
         .join("");
+}
+
+function ConversationListItem({
+    item,
+    isSelected,
+    isWide,
+    onPress,
+}: {
+    item: ConversationSummary;
+    isSelected: boolean;
+    isWide: boolean;
+    onPress: (conversationId: string) => void;
+}) {
+    return (
+        <Pressable
+            style={[styles.row, isSelected && isWide && styles.rowSelected]}
+            onPress={() => onPress(item._id)}
+        >
+            <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                    {getInitials(item.title || "PW")}
+                </Text>
+            </View>
+            <View style={styles.rowContent}>
+                <View style={styles.rowTop}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>
+                        {item.title}
+                    </Text>
+                    <Text style={styles.rowTime}>
+                        {formatTimestamp(item.lastMessageAt, { includeDate: true })}
+                    </Text>
+                </View>
+                <View style={styles.rowBottom}>
+                    <Text style={styles.preview} numberOfLines={1}>
+                        {item.preview || "Brak wiadomości"}
+                    </Text>
+                    {item.unreadCount > 0 && (
+                        <View style={styles.unreadBadge}>
+                            <Text style={styles.unreadText}>
+                                {item.unreadCount > 9 ? "9+" : item.unreadCount}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            </View>
+        </Pressable>
+    );
 }
 
 export default function ConversationListPanel({
@@ -56,6 +91,18 @@ export default function ConversationListPanel({
     isWide,
     isSocketConnected,
 }: Props) {
+    const renderItem = useCallback<ListRenderItem<ConversationSummary>>(
+        ({ item }) => (
+            <ConversationListItem
+                item={item}
+                isSelected={item._id === selectedConversationId}
+                isWide={isWide}
+                onPress={onOpenConversation}
+            />
+        ),
+        [isWide, onOpenConversation, selectedConversationId]
+    );
+
     return (
         <View style={[styles.container, isWide && styles.containerWide]}>
             <View style={styles.header}>
@@ -96,49 +143,7 @@ export default function ConversationListPanel({
                 data={conversations}
                 keyExtractor={(item) => item._id}
                 contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => {
-                    const isSelected = item._id === selectedConversationId;
-
-                    return (
-                        <Pressable
-                            style={[
-                                styles.row,
-                                isSelected && isWide && styles.rowSelected,
-                            ]}
-                            onPress={() => onOpenConversation(item._id)}
-                        >
-                            <View style={styles.avatar}>
-                                <Text style={styles.avatarText}>
-                                    {getInitials(item.title || "PW")}
-                                </Text>
-                            </View>
-                            <View style={styles.rowContent}>
-                                <View style={styles.rowTop}>
-                                    <Text style={styles.rowTitle} numberOfLines={1}>
-                                        {item.title}
-                                    </Text>
-                                    <Text style={styles.rowTime}>
-                                        {formatTimestamp(item.lastMessageAt)}
-                                    </Text>
-                                </View>
-                                <View style={styles.rowBottom}>
-                                    <Text style={styles.preview} numberOfLines={1}>
-                                        {item.preview || "Brak wiadomości"}
-                                    </Text>
-                                    {item.unreadCount > 0 && (
-                                        <View style={styles.unreadBadge}>
-                                            <Text style={styles.unreadText}>
-                                                {item.unreadCount > 9
-                                                    ? "9+"
-                                                    : item.unreadCount}
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                        </Pressable>
-                    );
-                }}
+                renderItem={renderItem}
                 ListEmptyComponent={
                     <View style={styles.emptyWrap}>
                         <Ionicons

@@ -4,10 +4,11 @@ import { fireEvent, render } from "@testing-library/react-native";
 const toggleSensitiveData = jest.fn();
 
 jest.mock("@/providers/AppProvider", () => ({
-  useAppState: jest.fn(),
+  useProfile: jest.fn(),
+  useUiPreferences: jest.fn(),
 }));
 
-import { useAppState } from "@/providers/AppProvider";
+import { useProfile, useUiPreferences } from "@/providers/AppProvider";
 import BalanceCard from "@/components/BalanceCard";
 
 describe("BalanceCard", () => {
@@ -16,7 +17,10 @@ describe("BalanceCard", () => {
   });
 
   it("maskuje dane gdy showSensitiveData jest false", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useProfile as jest.Mock).mockReturnValue({
+      profile: { login: "jan.kowalski" },
+    });
+    (useUiPreferences as jest.Mock).mockReturnValue({
       showSensitiveData: false,
       toggleSensitiveData,
     });
@@ -28,14 +32,17 @@ describe("BalanceCard", () => {
     expect(getByText("••••••")).toBeTruthy();
     expect(getByText("EUR ••••")).toBeTruthy();
     expect(getByText("USD ••••")).toBeTruthy();
-    expect(getByText("PayFlow •••• 4242")).toBeTruthy();
+    expect(getByText("Konto: ••••ki")).toBeTruthy();
 
     fireEvent.press(getByText("eye-outline"));
     expect(toggleSensitiveData).toHaveBeenCalledTimes(1);
   });
 
   it("pokazuje pełne kwoty gdy showSensitiveData jest true", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useProfile as jest.Mock).mockReturnValue({
+      profile: { login: "jan.kowalski" },
+    });
+    (useUiPreferences as jest.Mock).mockReturnValue({
       showSensitiveData: true,
       toggleSensitiveData,
     });
@@ -44,12 +51,15 @@ describe("BalanceCard", () => {
 
     expect(getByText("123.45 PLN")).toBeTruthy();
     expect(getByText("EUR 10.00")).toBeTruthy();
-    expect(getByText("PayFlow 1234 5678 9012 4242")).toBeTruthy();
+    expect(getByText("Konto: jan.kowalski")).toBeTruthy();
     expect(getByText("Pełne dane są widoczne tylko tymczasowo")).toBeTruthy();
   });
 
   it("nie renderuje sekcji walut obcych bez sald pomocniczych", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useProfile as jest.Mock).mockReturnValue({
+      profile: { login: "jan.kowalski" },
+    });
+    (useUiPreferences as jest.Mock).mockReturnValue({
       showSensitiveData: true,
       toggleSensitiveData,
     });

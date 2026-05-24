@@ -1,32 +1,11 @@
-const PRODUCTION_API_URL =
-    process.env.EXPO_PUBLIC_API_URL ||
-    "https://api.payflow.waw.pl";
+export {
+    API_URL,
+    apiRequest,
+    DEFAULT_REQUEST_TIMEOUT_MS,
+    httpClient,
+    request,
+} from "./httpClient";
 
-export const API_URL = __DEV__
-    ? "http://192.67.197.185:3000"
-    : PRODUCTION_API_URL;
+export type { ApiRequestOptions, HttpMethod } from "./httpClient";
 
-export async function apiRequest<T = unknown>(
-    endpoint: string,
-    method: string = "GET",
-    body?: Record<string, unknown>,
-    token?: string
-): Promise<T> {
-
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        method,
-        headers: {
-            "Content-Type": "application/json",
-            ...(token && { Authorization: `Bearer ${token}` })
-        },
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        throw data;
-    }
-
-    return data;
-}
+export { ApiError, ValidationError } from "./errors";

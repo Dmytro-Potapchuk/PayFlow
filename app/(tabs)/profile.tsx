@@ -3,23 +3,39 @@ import { useCallback } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useProfile, useSession, useToast } from "@/providers/AppProvider";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function ProfileScreen() {
-    const { clearSession, profile, refreshProfile, showToast } = useAppState();
+    const { clearSession } = useSession();
+    const { profile, refreshProfile } = useProfile();
+    const { showToast } = useToast();
 
     useFocusEffect(
         useCallback(() => {
-            refreshProfile({ silent: true });
+            refreshProfile({ silent: true }).catch((error: unknown) => {
+                logError("profile.refresh", error);
+            });
         }, [refreshProfile])
     );
 
     const logout = async () => {
-        await clearSession();
-        showToast("Informacja", "Zostałeś wylogowany", "info");
-        router.replace("/auth/login");
+        try {
+            await clearSession();
+            showToast("Informacja", "Zostałeś wylogowany", "info");
+            router.replace("/auth/login");
+        } catch (error: unknown) {
+            logError("profile.logout", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się wylogować"),
+                "error"
+            );
+        }
     };
 
     return (

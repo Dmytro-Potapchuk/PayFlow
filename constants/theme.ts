@@ -20,6 +20,12 @@ export const theme = {
         textMuted: "#7986cb",
         border: "#e8eaf6",
         borderLight: "#c5cae9",
+        noticeBackground: "#fff8e1",
+        noticeBorder: "#ffe082",
+        noticeText: "#6d4c41",
+        onPrimary: "#ffffff",
+        iosNoticeBackground: "#eef4ff",
+        iosNoticeBorder: "#c5d8ff",
     },
     spacing: {
         xs: 4,

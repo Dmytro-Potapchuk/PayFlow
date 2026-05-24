@@ -9,47 +9,63 @@ import {
 import { useState } from "react";
 import { router } from "expo-router";
 
-import { apiRequest } from "@/api/api";
-import { getErrorMessage } from "@/utils/errorMessage";
+import { login as loginRequest } from "@/api/auth.api";
+import { AUTH_FIELD_LIMITS } from "@/constants/authLimits";
+import { useIsMounted } from "@/hooks/useIsMounted";
 import AppButton from "@/components/AppButton";
 import AppInput from "@/components/AppInput";
-import PwaInstallNotice from "@/components/PwaInstallNotice";
+import IosHomeScreenNotice from "@/components/IosHomeScreenNotice";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useSession, useToast } from "@/providers/AppProvider";
+import { validateLoginForm } from "@/utils/authFormValidation";
+import {
+    getErrorMessage,
+    isUnauthorizedError,
+} from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function LoginScreen() {
     const [login, setLogin] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const { authenticate, showToast } = useAppState();
+    const isMountedRef = useIsMounted();
+    const { authenticate } = useSession();
+    const { showToast } = useToast();
 
     const handleLogin = async () => {
-        if (!login || !password) {
-            showToast("Błąd", "Wprowadź login i hasło", "error");
+        const validationError = validateLoginForm(login, password);
+        if (validationError) {
+            showToast("Błąd", validationError, "error");
             return;
         }
 
         try {
             setLoading(true);
-            const data = await apiRequest<{ access_token: string }>(
-                "/auth/login",
-                "POST",
-                { login, password }
-            );
+            const data = await loginRequest(login.trim(), password);
             await authenticate(data.access_token);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             showToast("Sukces", "Logowanie poprawne", "success");
             router.replace("/(tabs)");
         } catch (error: unknown) {
-            const message = getErrorMessage(error, "Nie udało się zalogować");
-            showToast(
-                "Błąd",
-                message.toLowerCase().includes("unauthorized")
-                    ? "Nieprawidłowy login lub email"
-                    : message,
-                "error"
-            );
+            logError("auth.login", error);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            const message = isUnauthorizedError(error)
+                ? "Nieprawidłowy login lub hasło"
+                : getErrorMessage(error, "Nie udało się zalogować");
+
+            showToast("Błąd", message, "error");
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -73,7 +89,7 @@ export default function LoginScreen() {
                         </Text>
                     </View>
 
-                    <PwaInstallNotice />
+                    <IosHomeScreenNotice />
 
                     <View style={styles.form}>
                         <AppInput
@@ -81,6 +97,7 @@ export default function LoginScreen() {
                             value={login}
                             onChangeText={setLogin}
                             autoCapitalize="none"
+                            maxLength={AUTH_FIELD_LIMITS.login.max}
                         />
                         <AppInput
                             placeholder="Hasło"
@@ -88,6 +105,7 @@ export default function LoginScreen() {
                             isPassword
                             value={password}
                             onChangeText={setPassword}
+                            maxLength={AUTH_FIELD_LIMITS.password.max}
                         />
                         <AppButton
                             title={loading ? "Logowanie..." : "Zaloguj się"}
@@ -100,6 +118,7 @@ export default function LoginScreen() {
                             title="Nie masz konta? Zarejestruj się"
                             onPress={() => router.push("/auth/register")}
                             variant="outline"
+                            disabled={loading}
                         />
                     </View>
                 </View>
@@ -132,10 +151,10 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
     notice: {
-        backgroundColor: "#fff8e1",
+        backgroundColor: theme.colors.noticeBackground,
         borderRadius: theme.radius.md,
         borderWidth: 1,
-        borderColor: "#ffe082",
+        borderColor: theme.colors.noticeBorder,
         padding: theme.spacing.md,
         marginBottom: theme.spacing.lg,
     },
@@ -148,7 +167,7 @@ const styles = StyleSheet.create({
     noticeText: {
         fontSize: 13,
         lineHeight: 18,
-        color: "#6d4c41",
+        color: theme.colors.noticeText,
     },
     form: {
         backgroundColor: theme.colors.surface,

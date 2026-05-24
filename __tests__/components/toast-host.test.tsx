@@ -1,22 +1,27 @@
 import React from "react";
-import { fireEvent, render } from "@testing-library/react-native";
+import { act, fireEvent, render } from "@testing-library/react-native";
 
 const dismissToast = jest.fn();
 
 jest.mock("@/providers/AppProvider", () => ({
-  useAppState: jest.fn(),
+  useToast: jest.fn(),
 }));
 
-import { useAppState } from "@/providers/AppProvider";
+import { useToast } from "@/providers/AppProvider";
 import ToastHost from "@/components/ToastHost";
 
 describe("ToastHost", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it("nie renderuje nic bez toastów", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useToast as jest.Mock).mockReturnValue({
       toasts: [],
       dismissToast,
     });
@@ -26,7 +31,7 @@ describe("ToastHost", () => {
   });
 
   it("renderuje toasty i zamyka wybrany element", () => {
-    (useAppState as jest.Mock).mockReturnValue({
+    (useToast as jest.Mock).mockReturnValue({
       toasts: [
         { id: "1", title: "OK", message: "Zapisano", type: "success" },
         { id: "2", title: "Błąd", message: "Nie wyszło", type: "error" },
@@ -46,5 +51,20 @@ describe("ToastHost", () => {
 
     fireEvent.press(getAllByLabelText("Zamknij powiadomienie")[1]);
     expect(dismissToast).toHaveBeenCalledWith("2");
+  });
+
+  it("automatycznie zamyka toast po kilku sekundach", () => {
+    (useToast as jest.Mock).mockReturnValue({
+      toasts: [{ id: "auto", title: "OK", message: "Zapisano", type: "success" }],
+      dismissToast,
+    });
+
+    render(<ToastHost />);
+
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(dismissToast).toHaveBeenCalledWith("auto");
   });
 });

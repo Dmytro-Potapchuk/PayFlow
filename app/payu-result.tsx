@@ -2,32 +2,48 @@ import { useEffect, useState } from "react";
 import { SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
-import { getToken } from "@/api/authStorage";
 import { confirmPayment } from "@/api/payu.api";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import AppButton from "@/components/AppButton";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useDashboard, useMessages, useToast } from "@/providers/AppProvider";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
 export default function PayuResultScreen() {
     const { extOrderId } = useLocalSearchParams<{ extOrderId?: string }>();
-    const { refreshDashboard, refreshMessages, showToast } = useAppState();
+    const { refreshDashboard } = useDashboard();
+    const { refreshMessages } = useMessages();
+    const { showToast } = useToast();
+    const { token } = useRequireAuthToken();
     const [statusText, setStatusText] = useState(
         "Sprawdzamy status płatności i odświeżamy saldo."
     );
 
     useEffect(() => {
+        let isActive = true;
+
+        const setStatusIfActive = (message: string) => {
+            if (isActive) {
+                setStatusText(message);
+            }
+        };
+
         const run = async () => {
-            const token = await getToken();
+            if (!isActive) {
+                return;
+            }
 
             if (token && extOrderId) {
                 try {
-                    const result = (await confirmPayment(extOrderId, token)) as {
-                        status?: string;
-                        balanceApplied?: boolean;
-                    };
+                    const result = await confirmPayment(extOrderId, token);
+
+                    if (!isActive) {
+                        return;
+                    }
 
                     if (result.balanceApplied) {
-                        setStatusText(
+                        setStatusIfActive(
                             "Płatność została potwierdzona. Saldo i historia zostały odświeżone."
                         );
                         showToast(
@@ -36,31 +52,45 @@ export default function PayuResultScreen() {
                             "success"
                         );
                     } else if (result.status === "PENDING") {
-                        setStatusText(
+                        setStatusIfActive(
                             "Płatność jest jeszcze przetwarzana przez PayU. Odśwież dane za chwilę."
                         );
                     } else if (result.status === "CANCELED") {
-                        setStatusText("Płatność została anulowana.");
+                        setStatusIfActive("Płatność została anulowana.");
                     } else {
-                        setStatusText(
+                        setStatusIfActive(
                             "Nie udało się jeszcze potwierdzić płatności. Spróbuj odświeżyć dane za chwilę."
                         );
                     }
-                } catch {
-                    setStatusText(
-                        "Wystąpił problem przy potwierdzaniu płatności. Spróbuj ponownie za chwilę."
+                } catch (error: unknown) {
+                    logError("payu-result.confirmPayment", error);
+                    setStatusIfActive(
+                        getErrorMessage(
+                            error,
+                            "Wystąpił problem przy potwierdzaniu płatności. Spróbuj ponownie za chwilę."
+                        )
                     );
                 }
             }
 
-            await Promise.all([
-                refreshDashboard({ silent: true }),
-                refreshMessages({ silent: true, skipToast: true }),
-            ]).catch(() => null);
+            try {
+                await Promise.all([
+                    refreshDashboard({ silent: true }),
+                    refreshMessages({ silent: true, skipToast: true }),
+                ]);
+            } catch (error: unknown) {
+                logError("payu-result.refresh", error);
+            }
         };
 
-        run().catch(() => null);
-    }, [extOrderId, refreshDashboard, refreshMessages, showToast]);
+        run().catch((error: unknown) => {
+            logError("payu-result.run", error);
+        });
+
+        return () => {
+            isActive = false;
+        };
+    }, [extOrderId, refreshDashboard, refreshMessages, showToast, token]);
 
     return (
         <SafeAreaView style={styles.safe}>

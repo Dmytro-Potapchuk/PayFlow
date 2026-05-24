@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet, Platform } from "react-native";
 import ToastHost from "@/components/ToastHost";
 import KeyboardDismissView from "@/components/KeyboardDismissView";
+import { theme } from "@/constants/theme";
 import { AppProvider } from "@/providers/AppProvider";
 
 export default function RootLayout() {
@@ -12,7 +13,7 @@ export default function RootLayout() {
             <Stack
                 screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: "#f5f7fa" },
+                    contentStyle: { backgroundColor: theme.colors.background },
                 }}
             />
             <ToastHost />

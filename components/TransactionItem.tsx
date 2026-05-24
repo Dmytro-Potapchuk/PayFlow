@@ -2,55 +2,91 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Transaction } from "@/types/transaction";
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useProfile, useUiPreferences } from "@/providers/AppProvider";
 
-export default function TransactionItem({ transaction }: { transaction: Transaction }) {
-    const { profile, showSensitiveData } = useAppState();
+type TransactionDisplay = {
+    icon: keyof typeof Ionicons.glyphMap;
+    iconColor: string;
+    label: string;
+    detail: string;
+    amountPrefix: string;
+};
+
+function getTransactionDisplay(
+    transaction: Transaction,
+    profileId: string | undefined,
+    showSensitiveData: boolean
+): TransactionDisplay {
     const isTransfer = transaction.type === "bank_transfer";
     const isOutgoingTransfer =
-        isTransfer && Boolean(profile?._id) && transaction.senderId === profile?._id;
+        isTransfer && Boolean(profileId) && transaction.senderId === profileId;
     const isIncomingTransfer = isTransfer && !isOutgoingTransfer;
 
-    const icon = isIncomingTransfer
-        ? "arrow-back"
-        : isOutgoingTransfer
-          ? "arrow-forward"
-          : "card";
-    const iconColor = isIncomingTransfer
-        ? theme.colors.success
-        : isOutgoingTransfer
-          ? theme.colors.error
-          : theme.colors.primary;
-    const label = isIncomingTransfer
-        ? "Przelew przychodzący"
-        : isOutgoingTransfer
-          ? "Przelew wychodzący"
-          : "Doładowanie";
-    const receiverLabel =
-        isOutgoingTransfer && transaction.receiverAccount
-            ? showSensitiveData
+    if (isIncomingTransfer) {
+        return {
+            icon: "arrow-back",
+            iconColor: theme.colors.success,
+            label: "Przelew przychodzący",
+            detail: "Wpływ na konto",
+            amountPrefix: "+",
+        };
+    }
+
+    if (isOutgoingTransfer) {
+        const detail =
+            transaction.receiverAccount && showSensitiveData
                 ? `Do: ${transaction.receiverAccount}`
-                : `Do: ${transaction.receiverAccount.slice(0, 2)}••••`
-            : isIncomingTransfer
-              ? "Wpływ na konto"
-              : "Doładowanie salda";
-    const amountPrefix = isIncomingTransfer ? "+" : isOutgoingTransfer ? "-" : "+";
+                : transaction.receiverAccount
+                  ? `Do: ${transaction.receiverAccount.slice(0, 2)}••••`
+                  : "Doładowanie salda";
+
+        return {
+            icon: "arrow-forward",
+            iconColor: theme.colors.error,
+            label: "Przelew wychodzący",
+            detail,
+            amountPrefix: "-",
+        };
+    }
+
+    return {
+        icon: "card",
+        iconColor: theme.colors.primary,
+        label: "Doładowanie",
+        detail: "Doładowanie salda",
+        amountPrefix: "+",
+    };
+}
+
+export default function TransactionItem({ transaction }: { transaction: Transaction }) {
+    const { profile } = useProfile();
+    const { showSensitiveData } = useUiPreferences();
+    const display = getTransactionDisplay(
+        transaction,
+        profile?._id,
+        showSensitiveData
+    );
 
     return (
         <View style={styles.row}>
-            <View style={[styles.iconWrap, { backgroundColor: `${iconColor}18` }]}>
+            <View
+                style={[
+                    styles.iconWrap,
+                    { backgroundColor: `${display.iconColor}18` },
+                ]}
+            >
                 <Ionicons
-                    name={icon as "arrow-forward"}
+                    name={display.icon}
                     size={20}
-                    color={iconColor}
+                    color={display.iconColor}
                 />
             </View>
             <View style={styles.content}>
-                <Text style={styles.type}>{label}</Text>
-                <Text style={styles.detail}>{receiverLabel}</Text>
+                <Text style={styles.type}>{display.label}</Text>
+                <Text style={styles.detail}>{display.detail}</Text>
             </View>
-            <Text style={[styles.amount, { color: iconColor }]}>
-                {amountPrefix}
+            <Text style={[styles.amount, { color: display.iconColor }]}>
+                {display.amountPrefix}
                 {transaction.amount} PLN
             </Text>
         </View>

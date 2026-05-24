@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
     Animated,
     Modal,
@@ -12,7 +12,7 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useMessages, useProfile } from "@/providers/AppProvider";
 
 const PRIMARY_TABS = [
     {
@@ -67,9 +67,37 @@ const HIDDEN_ROUTE_META: Record<
     },
 };
 
+function animateMenu(
+    fade: Animated.Value,
+    translateY: Animated.Value,
+    visible: boolean,
+    onComplete?: () => void
+) {
+    fade.setValue(visible ? 0 : 1);
+    translateY.setValue(visible ? 18 : 0);
+
+    Animated.parallel([
+        Animated.timing(fade, {
+            toValue: visible ? 1 : 0,
+            duration: visible ? 200 : 180,
+            useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+            toValue: visible ? 0 : 18,
+            duration: visible ? 200 : 180,
+            useNativeDriver: true,
+        }),
+    ]).start(({ finished }) => {
+        if (finished) {
+            onComplete?.();
+        }
+    });
+}
+
 export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
-    const { profile, unreadMessages } = useAppState();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { profile } = useProfile();
+    const { unreadMessages } = useMessages();
+    const [modalVisible, setModalVisible] = useState(false);
     const fade = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(18)).current;
 
@@ -94,25 +122,16 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
             !PRIMARY_TABS.some((tab) => tab.routeName === currentRouteName)
     );
 
-    useEffect(() => {
-        if (isMenuOpen) {
-            Animated.parallel([
-                Animated.timing(fade, {
-                    toValue: 1,
-                    duration: 200,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(translateY, {
-                    toValue: 0,
-                    duration: 200,
-                    useNativeDriver: true,
-                }),
-            ]).start();
-        } else {
-            fade.setValue(0);
-            translateY.setValue(18);
-        }
-    }, [fade, isMenuOpen, translateY]);
+    const openMenu = () => {
+        setModalVisible(true);
+        requestAnimationFrame(() => {
+            animateMenu(fade, translateY, true);
+        });
+    };
+
+    const closeMenu = () => {
+        animateMenu(fade, translateY, false, () => setModalVisible(false));
+    };
 
     return (
         <>
@@ -132,7 +151,9 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
                         return (
                             <Pressable
                                 key={tab.routeName}
-                                accessibilityRole="button"
+                                accessibilityRole="tab"
+                                accessibilityState={{ selected: isFocused }}
+                                accessibilityLabel={tab.label}
                                 style={styles.tabButton}
                                 onPress={() => navigation.navigate(tab.routeName)}
                             >
@@ -174,7 +195,7 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
                     <Pressable
                         accessibilityRole="button"
                         style={styles.tabButton}
-                        onPress={() => setIsMenuOpen(true)}
+                        onPress={openMenu}
                     >
                         <View style={styles.iconSlot}>
                             <Ionicons
@@ -200,24 +221,26 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
             </View>
 
             <Modal
-                visible={isMenuOpen}
+                visible={modalVisible}
                 transparent
                 animationType="none"
-                onRequestClose={() => setIsMenuOpen(false)}
+                onRequestClose={closeMenu}
             >
                 <Pressable
+                    testID="app-tabbar-menu-backdrop"
                     style={styles.modalBackdrop}
-                    onPress={() => setIsMenuOpen(false)}
+                    onPress={closeMenu}
                 >
-                    <Animated.View
-                        style={[
-                            styles.menuSheet,
-                            {
-                                opacity: fade,
-                                transform: [{ translateY }],
-                            },
-                        ]}
-                    >
+                    <Pressable onPress={() => undefined}>
+                        <Animated.View
+                            style={[
+                                styles.menuSheet,
+                                {
+                                    opacity: fade,
+                                    transform: [{ translateY }],
+                                },
+                            ]}
+                        >
                         <Text style={styles.menuTitle}>Więcej funkcji</Text>
                         <Text style={styles.menuSubtitle}>
                             Szybki dostęp do pozostałych modułów
@@ -228,7 +251,7 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
                                 key={item.routeName}
                                 style={styles.menuItem}
                                 onPress={() => {
-                                    setIsMenuOpen(false);
+                                    closeMenu();
                                     navigation.navigate(item.routeName);
                                 }}
                             >
@@ -254,7 +277,8 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
                                 />
                             </Pressable>
                         ))}
-                    </Animated.View>
+                        </Animated.View>
+                    </Pressable>
                 </Pressable>
             </Modal>
         </>

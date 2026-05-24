@@ -7,128 +7,172 @@ import {
     ActivityIndicator,
     SafeAreaView,
     useWindowDimensions,
+    TouchableOpacity,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { getToken } from "@/api/authStorage";
 import { getUsers, updateBalance, updateRole } from "@/api/users.api";
 import AppButton from "@/components/AppButton";
+import { isCompactWidth } from "@/constants/layout";
 import { theme } from "@/constants/theme";
 import { keyboardShouldPersistTaps } from "@/constants/keyboard";
-import { useAppState } from "@/providers/AppProvider";
+import { useRequireAdmin } from "@/hooks/useRequireAdmin";
+import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
+import { useIsMounted } from "@/hooks/useIsMounted";
+import { useToast } from "@/providers/AppProvider";
+import type { AdminUserSummary, UserRole } from "@/types/api.types";
+import { getErrorMessage } from "@/utils/errorMessage";
+import { logError } from "@/utils/logError";
 
-interface User {
-    _id: string;
-    login: string;
-    email: string;
-    balance: number;
-    role: string;
-}
+const USER_ROLES: UserRole[] = ["user", "admin"];
 
 export default function AdminScreen() {
-    const [users, setUsers] = useState<User[]>([]);
+    const { isAllowed, isChecking } = useRequireAdmin();
+    const { requireToken } = useRequireAuthToken();
+    const [users, setUsers] = useState<AdminUserSummary[]>([]);
     const [loading, setLoading] = useState(false);
     const [savingId, setSavingId] = useState<string | null>(null);
     const [balanceInputs, setBalanceInputs] = useState<Record<string, string>>({});
-    const [roleInputs, setRoleInputs] = useState<Record<string, string>>({});
-    const { showToast } = useAppState();
+    const [roleInputs, setRoleInputs] = useState<Record<string, UserRole>>({});
+    const { showToast } = useToast();
     const { width } = useWindowDimensions();
-    const isCompact = width <= 430;
+    const isCompact = isCompactWidth(width);
+    const isMountedRef = useIsMounted();
 
-    useEffect(() => {
-        loadUsers();
-    }, []);
-
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         try {
             setLoading(true);
-            const token = await getToken();
+            const token = requireToken();
             if (!token) {
-                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
                 return;
             }
 
-            const data: User[] = await getUsers(token);
+            const data = await getUsers(token);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             setUsers(data);
 
             const initialBalances: Record<string, string> = {};
-            const initialRoles: Record<string, string> = {};
-            data.forEach((u) => {
-                initialBalances[u._id] = String(u.balance);
-                initialRoles[u._id] = u.role;
+            const initialRoles: Record<string, UserRole> = {};
+            data.forEach((user) => {
+                initialBalances[user._id] = String(user.balance ?? 0);
+                initialRoles[user._id] =
+                    user.role === "admin" ? "admin" : "user";
             });
             setBalanceInputs(initialBalances);
             setRoleInputs(initialRoles);
-        } catch {
-            showToast("Błąd", "Nie udało się pobrać użytkowników.", "error");
+        } catch (error: unknown) {
+            logError("admin.loadUsers", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się pobrać użytkowników."),
+                "error"
+            );
         } finally {
-            setLoading(false);
+            if (isMountedRef.current) {
+                setLoading(false);
+            }
         }
-    };
+    }, [isMountedRef, requireToken, showToast]);
+
+    useEffect(() => {
+        if (isAllowed) {
+            loadUsers();
+        }
+    }, [isAllowed, loadUsers]);
 
     const handleSaveBalance = async (userId: string) => {
         const balanceText = balanceInputs[userId] ?? "";
         const newBalance = Number(balanceText);
 
-        if (isNaN(newBalance)) {
+        if (!Number.isFinite(newBalance)) {
             showToast("Błąd", "Saldo musi być liczbą.", "error");
             return;
         }
 
-        try {
-            setSavingId(userId);
-            const token = await getToken();
-            if (!token) {
-                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
-                return;
-            }
-
-            await updateBalance(userId, newBalance, token);
-            setUsers((prev) =>
-                prev.map((u) =>
-                    u._id === userId ? { ...u, balance: newBalance } : u
-                )
-            );
-            showToast("Sukces", "Saldo zaktualizowane.", "success");
-        } catch {
-            showToast("Błąd", "Nie udało się zaktualizować salda.", "error");
-        } finally {
-            setSavingId(null);
-        }
-    };
-
-    const handleSaveRole = async (userId: string) => {
-        const role = roleInputs[userId] ?? "";
-        if (!role) {
-            showToast("Błąd", "Rola nie może być pusta.", "error");
+        if (newBalance < 0) {
+            showToast("Błąd", "Saldo nie może być ujemne.", "error");
             return;
         }
 
         try {
             setSavingId(userId);
-            const token = await getToken();
+            const token = requireToken();
             if (!token) {
-                showToast("Błąd", "Brak tokenu – zaloguj się ponownie.", "error");
+                return;
+            }
+
+            await updateBalance(userId, newBalance, token);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
+            setUsers((prev) =>
+                prev.map((user) =>
+                    user._id === userId ? { ...user, balance: newBalance } : user
+                )
+            );
+            showToast("Sukces", "Saldo zaktualizowane.", "success");
+        } catch (error: unknown) {
+            logError("admin.updateBalance", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się zaktualizować salda."),
+                "error"
+            );
+        } finally {
+            if (isMountedRef.current) {
+                setSavingId(null);
+            }
+        }
+    };
+
+    const handleSaveRole = async (userId: string) => {
+        const role = roleInputs[userId];
+
+        if (!role) {
+            showToast("Błąd", "Wybierz rolę użytkownika.", "error");
+            return;
+        }
+
+        try {
+            setSavingId(userId);
+            const token = requireToken();
+            if (!token) {
                 return;
             }
 
             await updateRole(userId, role, token);
+
+            if (!isMountedRef.current) {
+                return;
+            }
+
             setUsers((prev) =>
-                prev.map((u) =>
-                    u._id === userId ? { ...u, role } : u
-                )
+                prev.map((user) => (user._id === userId ? { ...user, role } : user))
             );
             showToast("Sukces", "Rola zaktualizowana.", "success");
-        } catch {
-            showToast("Błąd", "Nie udało się zaktualizować roli.", "error");
+        } catch (error: unknown) {
+            logError("admin.updateRole", error);
+            showToast(
+                "Błąd",
+                getErrorMessage(error, "Nie udało się zaktualizować roli."),
+                "error"
+            );
         } finally {
-            setSavingId(null);
+            if (isMountedRef.current) {
+                setSavingId(null);
+            }
         }
     };
 
-    const renderItem = ({ item }: { item: User }) => {
-        const balanceText = balanceInputs[item._id] ?? String(item.balance);
-        const roleText = roleInputs[item._id] ?? item.role;
+    const renderItem = ({ item }: { item: AdminUserSummary }) => {
+        const balanceText = balanceInputs[item._id] ?? String(item.balance ?? 0);
+        const selectedRole = roleInputs[item._id] ?? item.role;
         const isSaving = savingId === item._id;
 
         return (
@@ -161,18 +205,35 @@ export default function AdminScreen() {
 
                 <View style={[styles.row, isCompact && styles.rowCompact]}>
                     <Text style={[styles.label, isCompact && styles.labelCompact]}>Rola</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={roleText}
-                        onChangeText={(text) =>
-                            setRoleInputs((prev) => ({
-                                ...prev,
-                                [item._id]: text,
-                            }))
-                        }
-                        placeholder="user / admin"
-                        placeholderTextColor={theme.colors.textMuted}
-                    />
+                    <View style={styles.rolePicker}>
+                        {USER_ROLES.map((role) => {
+                            const isSelected = selectedRole === role;
+                            return (
+                                <TouchableOpacity
+                                    key={role}
+                                    style={[
+                                        styles.roleOption,
+                                        isSelected && styles.roleOptionSelected,
+                                    ]}
+                                    onPress={() =>
+                                        setRoleInputs((prev) => ({
+                                            ...prev,
+                                            [item._id]: role,
+                                        }))
+                                    }
+                                >
+                                    <Text
+                                        style={[
+                                            styles.roleOptionText,
+                                            isSelected && styles.roleOptionTextSelected,
+                                        ]}
+                                    >
+                                        {role}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
                     <AppButton
                         title="Zapisz"
                         onPress={() => handleSaveRole(item._id)}
@@ -184,6 +245,22 @@ export default function AdminScreen() {
             </View>
         );
     };
+
+    if (isChecking) {
+        return (
+            <SafeAreaView style={styles.safe}>
+                <ActivityIndicator
+                    size="large"
+                    color={theme.colors.primary}
+                    style={styles.loader}
+                />
+            </SafeAreaView>
+        );
+    }
+
+    if (!isAllowed) {
+        return null;
+    }
 
     return (
         <SafeAreaView style={styles.safe}>
@@ -273,6 +350,32 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         fontSize: 14,
         color: theme.colors.text,
+    },
+    rolePicker: {
+        flex: 1,
+        flexDirection: "row",
+        gap: theme.spacing.sm,
+    },
+    roleOption: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        borderRadius: theme.radius.sm,
+        paddingVertical: 10,
+        alignItems: "center",
+    },
+    roleOptionSelected: {
+        borderColor: theme.colors.primary,
+        backgroundColor: theme.colors.border,
+    },
+    roleOptionText: {
+        fontSize: 14,
+        color: theme.colors.textMuted,
+        textTransform: "capitalize",
+    },
+    roleOptionTextSelected: {
+        color: theme.colors.primary,
+        fontWeight: "600",
     },
     smallBtn: {
         paddingHorizontal: 16,

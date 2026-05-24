@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { theme } from "@/constants/theme";
-import { useAppState } from "@/providers/AppProvider";
+import { useProfile, useUiPreferences } from "@/providers/AppProvider";
 
 type Props = {
     balance: number;
@@ -10,8 +10,23 @@ type Props = {
     balanceUsd?: number;
 };
 
+function formatAccountLabel(login: string | undefined, showSensitiveData: boolean) {
+    if (!login) {
+        return "Konto PayFlow";
+    }
+
+    if (showSensitiveData) {
+        return `Konto: ${login}`;
+    }
+
+    const visibleSuffix = login.length > 2 ? login.slice(-2) : login;
+    return `Konto: ••••${visibleSuffix}`;
+}
+
 export default function BalanceCard({ balance, balanceEur = 0, balanceUsd = 0 }: Props) {
-    const { showSensitiveData, toggleSensitiveData } = useAppState();
+    const { profile } = useProfile();
+    const { showSensitiveData, toggleSensitiveData } = useUiPreferences();
+    const accountLabel = formatAccountLabel(profile?.login, showSensitiveData);
 
     const maskValue = (value: number, currency: string) =>
         showSensitiveData ? `${value.toFixed(2)} ${currency}` : "••••••";
@@ -55,9 +70,7 @@ export default function BalanceCard({ balance, balanceEur = 0, balanceUsd = 0 }:
                 </View>
             )}
             <View style={styles.footer}>
-                <Text style={styles.cardNumber}>
-                    {showSensitiveData ? "PayFlow 1234 5678 9012 4242" : "PayFlow •••• 4242"}
-                </Text>
+                <Text style={styles.cardNumber}>{accountLabel}</Text>
                 <Text style={styles.footerHint}>
                     {showSensitiveData
                         ? "Pełne dane są widoczne tylko tymczasowo"
