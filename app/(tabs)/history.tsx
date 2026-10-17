@@ -21,34 +21,43 @@ export default function HistoryScreen() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
     const [errorText, setErrorText] = useState<string | null>(null);
     const isMountedRef = useRef(true);
+    const pageRef = useRef(1);
 
-    const loadHistory = useCallback(async () => {
+    const loadHistory = useCallback(async (page: number, append: boolean) => {
         try {
             const token = requireToken();
 
             if (!token) {
                 if (isMountedRef.current) {
                     setTransactions([]);
+                    setHasMore(false);
                     setErrorText("Brak sesji – zaloguj się ponownie.");
                 }
                 return;
             }
 
-            const data = await getHistory(token);
+            const data = await getHistory(token, page, 20);
 
             if (!isMountedRef.current) {
                 return;
             }
 
-            setTransactions(data);
+            pageRef.current = data.page;
+            setHasMore(data.hasMore);
+            setTransactions((current) =>
+                append ? [...current, ...data.items] : data.items
+            );
             setErrorText(null);
         } catch (error: unknown) {
             logError("history.load", error);
 
-            if (isMountedRef.current) {
+            if (isMountedRef.current && !append) {
                 setTransactions([]);
+                setHasMore(false);
                 setErrorText("Nie udało się pobrać historii transakcji.");
             }
         }
@@ -59,7 +68,7 @@ export default function HistoryScreen() {
             isMountedRef.current = true;
             setLoading(true);
 
-            loadHistory().finally(() => {
+            loadHistory(1, false).finally(() => {
                 if (isMountedRef.current) {
                     setLoading(false);
                 }
@@ -75,7 +84,7 @@ export default function HistoryScreen() {
         setRefreshing(true);
 
         try {
-            await loadHistory();
+            await loadHistory(1, false);
         } finally {
             if (isMountedRef.current) {
                 setRefreshing(false);
@@ -109,6 +118,24 @@ export default function HistoryScreen() {
                             <Text style={styles.empty}>
                                 {errorText ?? "Brak transakcji"}
                             </Text>
+                        }
+                        onEndReached={() => {
+                            if (loadingMore || !hasMore) {
+                                return;
+                            }
+
+                            setLoadingMore(true);
+                            loadHistory(pageRef.current + 1, true).finally(() => {
+                                if (isMountedRef.current) {
+                                    setLoadingMore(false);
+                                }
+                            });
+                        }}
+                        onEndReachedThreshold={0.4}
+                        ListFooterComponent={
+                            loadingMore ? (
+                                <Text style={styles.loadingText}>Wczytywanie...</Text>
+                            ) : null
                         }
                         refreshControl={
                             <RefreshControl

@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useCallback, useEffect, useState } from "react";
 
-import { getRates, buyCurrency } from "@/api/currency.api";
+import { getRates, buyCurrency, sellCurrency } from "@/api/currency.api";
 import type { CurrencyCode } from "@/types/api.types";
 import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import { getErrorMessage } from "@/utils/errorMessage";
@@ -34,6 +34,7 @@ export default function CurrencyScreen() {
     const [selected, setSelected] = useState<NbpRate | null>(null);
     const [result, setResult] = useState<string | null>(null);
     const [buying, setBuying] = useState(false);
+    const [mode, setMode] = useState<"buy" | "sell">("buy");
     const { refreshDashboard } = useDashboard();
     const { refreshMessages } = useMessages();
     const { showToast } = useToast();
@@ -110,7 +111,9 @@ export default function CurrencyScreen() {
                 return;
             }
 
-            const response = await buyCurrency(amount, currencyCode, token);
+            const response = mode === "sell"
+            ? await sellCurrency(amount, currencyCode, token)
+            : await buyCurrency(amount, currencyCode, token);
             await Promise.all([
                 refreshDashboard({ silent: true }),
                 refreshMessages({ silent: true, skipToast: true }),
@@ -122,7 +125,9 @@ export default function CurrencyScreen() {
 
             showToast(
                 "Sukces",
-                `Kupiono ${response.boughtAmount.toFixed(2)} ${response.currencyCode}.`,
+                mode === "sell"
+                    ? `Sprzedano ${amount.toFixed(2)} ${currencyCode}.`
+                    : `Kupiono ${response.boughtAmount.toFixed(2)} ${response.currencyCode}.`,
                 "success"
             );
             setAmountPln("");
@@ -170,9 +175,27 @@ export default function CurrencyScreen() {
                 </View>
 
                 <View style={styles.card}>
-                    <Text style={styles.sectionTitle}>Przelicznik PLN → waluta</Text>
+                    <Text style={styles.sectionTitle}>
+                        {mode === "sell" ? "Sprzedaż waluty na PLN" : "Kupno waluty za PLN"}
+                    </Text>
+                    <View style={styles.buttonRow}>
+                        <AppButton
+                            title="Kup"
+                            variant={mode === "buy" ? "primary" : "outline"}
+                            onPress={() => setMode("buy")}
+                            style={styles.btn}
+                            disabled={buying}
+                        />
+                        <AppButton
+                            title="Sprzedaj"
+                            variant={mode === "sell" ? "primary" : "outline"}
+                            onPress={() => setMode("sell")}
+                            style={styles.btn}
+                            disabled={buying}
+                        />
+                    </View>
                     <AppInput
-                        placeholder="Kwota w PLN"
+                        placeholder={mode === "sell" ? "Kwota w wybranej walucie" : "Kwota w PLN"}
                         keyboardType="decimal-pad"
                         value={amountPln}
                         onChangeText={setAmountPln}
@@ -193,7 +216,13 @@ export default function CurrencyScreen() {
                         />
                         {canBuyCurrency(selected) && (
                             <AppButton
-                                title={buying ? "Kupowanie..." : "Kup walutę"}
+                                title={
+                                    buying
+                                        ? "Wymiana..."
+                                        : mode === "sell"
+                                          ? "Sprzedaj walutę"
+                                          : "Kup walutę"
+                                }
                                 onPress={handleBuy}
                                 disabled={buying}
                                 loading={buying}
@@ -261,6 +290,7 @@ const styles = StyleSheet.create({
     buttonRow: {
         flexDirection: "row",
         gap: theme.spacing.md,
+        marginBottom: theme.spacing.md,
     },
     btn: { flex: 1 },
     rateRow: {

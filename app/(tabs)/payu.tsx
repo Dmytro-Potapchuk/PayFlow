@@ -51,8 +51,8 @@ export default function PayuScreen() {
 
             const profile = await getProfile(token);
             const returnUrl =
-                Platform.OS === "web"
-                    ? undefined
+                Platform.OS === "web" && typeof window !== "undefined"
+                    ? `${window.location.origin}/payu-result`
                     : Linking.createURL("/payu-result");
             const result = await createPayment(
                 value,

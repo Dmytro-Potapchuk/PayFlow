@@ -1,6 +1,7 @@
 import { endpoints } from "./endpoints";
 import { httpClient } from "./httpClient";
 import {
+    assertNonEmptyString,
     assertPositiveNumber,
     assertResourceId,
     assertToken,
@@ -11,6 +12,36 @@ import type {
     UserProfile,
     UserRole,
 } from "@/types/api.types";
+
+export async function lookupRecipient(
+    login: string,
+    token: string
+): Promise<{ _id: string; login: string }> {
+    assertToken(token);
+    assertNonEmptyString(login, "Login odbiorcy");
+
+    return httpClient.get<{ _id: string; login: string }>(
+        endpoints.users.lookup(login),
+        token
+    );
+}
+
+export async function updateOwnProfile(
+    token: string,
+    body: {
+        phone?: string;
+        currentPassword?: string;
+        newPassword?: string;
+    }
+): Promise<UserProfile> {
+    assertToken(token);
+
+    return httpClient.patch<UserProfile>(
+        endpoints.users.profile(),
+        body,
+        token
+    );
+}
 
 export async function getProfile(token: string): Promise<UserProfile> {
     assertToken(token);

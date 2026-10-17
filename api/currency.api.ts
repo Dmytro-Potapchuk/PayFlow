@@ -28,3 +28,19 @@ export async function buyCurrency(
         token
     );
 }
+
+export async function sellCurrency(
+    amount: number,
+    currencyCode: CurrencyCode,
+    token: string
+): Promise<CurrencyBuyResponse & { soldAmount: number; plnAmount: number }> {
+    assertToken(token);
+    assertMinAmount(amount, 0.01, "Kwota");
+    assertCurrencyCode(currencyCode);
+
+    return httpClient.post(
+        endpoints.currency.sell(),
+        { amount, currencyCode },
+        token
+    );
+}

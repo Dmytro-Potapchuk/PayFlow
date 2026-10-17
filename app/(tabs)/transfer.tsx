@@ -11,6 +11,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 
 import { createTransfer } from "@/api/transactions.api";
+import { lookupRecipient } from "@/api/users.api";
 import { useRequireAuthToken } from "@/hooks/useRequireAuthToken";
 import { AUTH_FIELD_LIMITS } from "@/constants/authLimits";
 import { useIsMounted } from "@/hooks/useIsMounted";
@@ -28,6 +29,7 @@ import { logError } from "@/utils/logError";
 export default function TransferScreen() {
     const [receiverLogin, setReceiverLogin] = useState("");
     const [amount, setAmount] = useState("");
+    const [confirmedLogin, setConfirmedLogin] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const isMountedRef = useIsMounted();
     const { requireToken } = useRequireAuthToken();
@@ -65,7 +67,17 @@ export default function TransferScreen() {
                 return;
             }
 
-            await createTransfer(trimmedReceiver, transferAmount, token);
+            if (!confirmedLogin) {
+                const recipient = await lookupRecipient(trimmedReceiver, token);
+                if (!isMountedRef.current) {
+                    return;
+                }
+                setConfirmedLogin(recipient.login);
+                setReceiverLogin(recipient.login);
+                return;
+            }
+
+            await createTransfer(confirmedLogin, transferAmount, token);
 
             await Promise.all([
                 refreshDashboard({ silent: true }),
@@ -79,6 +91,7 @@ export default function TransferScreen() {
             showToast("Sukces", "Przelew zakończony sukcesem", "success");
             setReceiverLogin("");
             setAmount("");
+            setConfirmedLogin(null);
             router.push("/(tabs)/history");
         } catch (error: unknown) {
             logError("transfer.create", error);
@@ -122,7 +135,10 @@ export default function TransferScreen() {
                             label="Login odbiorcy"
                             placeholder="Wpisz login odbiorcy"
                             value={receiverLogin}
-                            onChangeText={setReceiverLogin}
+                            onChangeText={(value) => {
+                                setReceiverLogin(value);
+                                setConfirmedLogin(null);
+                            }}
                             autoCapitalize="none"
                             autoCorrect={false}
                             maxLength={AUTH_FIELD_LIMITS.login.max}
@@ -133,15 +149,40 @@ export default function TransferScreen() {
                             placeholder="0.00"
                             keyboardType="decimal-pad"
                             value={amount}
-                            onChangeText={setAmount}
+                            onChangeText={(value) => {
+                                setAmount(value);
+                                setConfirmedLogin(null);
+                            }}
                             editable={!loading}
                         />
+                        {confirmedLogin ? (
+                            <View style={styles.confirmBox}>
+                                <Text style={styles.confirmTitle}>Potwierdź przelew</Text>
+                                <Text style={styles.confirmText}>
+                                    {Number(amount).toFixed(2)} PLN dla {confirmedLogin}
+                                </Text>
+                            </View>
+                        ) : null}
                         <AppButton
-                            title={loading ? "Wysyłanie..." : "Wyślij przelew"}
+                            title={
+                                loading
+                                    ? "Wysyłanie..."
+                                    : confirmedLogin
+                                      ? "Potwierdź przelew"
+                                      : "Sprawdź odbiorcę"
+                            }
                             onPress={handleTransfer}
                             loading={loading}
                             disabled={loading}
                         />
+                        {confirmedLogin ? (
+                            <AppButton
+                                title="Wróć do edycji"
+                                variant="outline"
+                                onPress={() => setConfirmedLogin(null)}
+                                disabled={loading}
+                            />
+                        ) : null}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -171,5 +212,21 @@ const styles = StyleSheet.create({
         borderRadius: theme.radius.lg,
         padding: theme.spacing.lg,
         ...theme.shadows.md,
+    },
+    confirmBox: {
+        backgroundColor: theme.colors.noticeBackground,
+        borderRadius: theme.radius.md,
+        padding: theme.spacing.md,
+        marginBottom: theme.spacing.md,
+    },
+    confirmTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: theme.colors.text,
+        marginBottom: 4,
+    },
+    confirmText: {
+        fontSize: 16,
+        color: theme.colors.text,
     },
 });

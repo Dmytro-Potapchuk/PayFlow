@@ -8,6 +8,14 @@ import {
 } from "./validation";
 import type { Transaction } from "@/types/transaction";
 
+export type TransactionPage = {
+    items: Transaction[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+};
+
 export async function createTransfer(
     receiverAccount: string,
     amount: number,
@@ -24,11 +32,15 @@ export async function createTransfer(
     );
 }
 
-export async function getHistory(token: string): Promise<Transaction[]> {
+export async function getHistory(
+    token: string,
+    page = 1,
+    limit = 20
+): Promise<TransactionPage> {
     assertToken(token);
 
-    return httpClient.get<Transaction[]>(
-        endpoints.transactions.history(),
+    return httpClient.get<TransactionPage>(
+        endpoints.transactions.history(page, limit),
         token
     );
 }

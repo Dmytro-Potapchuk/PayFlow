@@ -10,19 +10,23 @@ export const endpoints = {
     },
     users: {
         profile: () => "/users/profile",
+        lookup: (login: string) =>
+            `/users/lookup?login=${encode(login.trim())}`,
         list: () => "/users",
         balance: (userId: string) => `/users/${encode(userId)}/balance`,
         role: (userId: string) => `/users/${encode(userId)}/role`,
     },
     transactions: {
         bankTransfer: () => "/transactions/bank-transfer",
-        history: () => "/transactions/history",
+        history: (page = 1, limit = 20) =>
+            `/transactions/history?page=${page}&limit=${limit}`,
         byId: (transactionId: string) =>
             `/transactions/${encode(transactionId)}`,
     },
     currency: {
         rates: () => "/currency/rates",
         buy: () => "/currency/buy",
+        sell: () => "/currency/sell",
     },
     payu: {
         createPayment: () => "/payu/create-payment",

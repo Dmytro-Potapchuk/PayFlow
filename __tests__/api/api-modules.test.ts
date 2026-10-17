@@ -103,7 +103,10 @@ describe("api wrapper modules", () => {
       { receiverAccount: "PL001", amount: 99 },
       "token-1"
     );
-    expect(mockGet).toHaveBeenCalledWith("/transactions/history", "token-1");
+    expect(mockGet).toHaveBeenCalledWith(
+      "/transactions/history?page=1&limit=20",
+      "token-1"
+    );
     expect(mockGet).toHaveBeenCalledWith("/transactions/tx-1", "token-1");
     expect(mockGet).toHaveBeenCalledWith("/currency/rates");
     expect(mockPost).toHaveBeenCalledWith(
